@@ -15,7 +15,7 @@ class ScafiDSLPlugin(val global: Global) extends Plugin {
   //global include all compile time information.
   implicit val g: Global = global
   //the term used to check and find the properties of aggregate program
-  private val commonTerm = new ScafiNames("ProgramSchema", "fooldhood", "nbr", "rep")
+  private val commonTerm = new ScafiNames("ProgramSchema", "foldhood", "nbr", "rep")
   //the context used in all plugin components.
   implicit val componentContext : ComponentContext = ComponentContext(g, commonTerm)
   override val name: String = "scafiplugin"

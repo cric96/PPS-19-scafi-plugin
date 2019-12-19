@@ -4,7 +4,7 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class TestCompiler extends StandardTest {
+class TestCompiler extends PluginTest {
   "The compiler" should "compile correct code" in {
     compiler.compile("object y extends App").hasErrors shouldBe false
     compiler.compile(

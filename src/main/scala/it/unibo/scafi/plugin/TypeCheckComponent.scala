@@ -55,19 +55,16 @@ class TypeCheckComponent(context : ComponentContext) extends CommonComponent(con
         tree.children.foreach(ifPresenceCheck)
     }
 
-    private def nbrNestedCheck(tree : Tree) : Unit = {
-      if(isNbr(tree) && tree.children.exists(checkNbrPresence)) {
+    private def nbrNestedCheck(tree : Tree) : Unit = extractByApplyName(tree, context.names.nbr) match {
+      case Some(apply) => if(apply.args(firstArg).exists(nbrPresence))
         global.reporter.error(tree.pos, nbrNestedErrorString)
-      } else {
-        tree.children.foreach(nbrNestedCheck)
-      }
+      case _ =>  tree.children.foreach(nbrNestedCheck)
     }
 
-    private def checkNbrPresence(tree : Tree) : Boolean = if (isNbr(tree)) {
-      println(tree)
+    private def nbrPresence(tree : Tree) : Boolean = if (isNbr(tree)) {
       true
     } else {
-      tree.children.exists(checkNbrPresence)
+      tree.children.exists(nbrPresence)
     }
 
     private def isNbr(tree : Tree) : Boolean = sameApplyName(tree, context.names.nbr)
@@ -75,11 +72,18 @@ class TypeCheckComponent(context : ComponentContext) extends CommonComponent(con
     private def foldhoodAndRepCorrectness(tree : Tree) : Unit = {
       val foldHoodApply = extractByApplyName(tree, context.names.hood)
       val repApply = extractByApplyName(tree, context.names.rep)
+      //TODO make more readable
       (foldHoodApply, repApply) match {
-        case (Some(apply), None) => if(checkNbrPresence(apply.args(zeroPosition)))
-          global.reporter.error(tree.pos, nbrNestedErrorString)
-        case (None, Some(apply)) => if(checkNbrPresence(apply.args(zeroPosition)))
-          global.reporter.error(tree.pos, nbrNestedErrorString)
+        case (Some(apply), None) =>
+          val uncurried = uncurry(apply, curryingFoldTimes)
+          if(nbrPresence(uncurried.args(firstArg))) {
+            global.reporter.error(tree.pos, foldHoodErrorString)
+          }
+        case (None, Some(apply)) =>
+          val uncurried = uncurry(apply, curryingRepTimes)
+          if(nbrPresence(uncurried.args(firstArg))) {
+            global.reporter.error(tree.pos, repErrorString)
+          }
         case _ => tree.children.foreach{foldhoodAndRepCorrectness}
       }
     }
@@ -90,6 +94,12 @@ class TypeCheckComponent(context : ComponentContext) extends CommonComponent(con
     }
 
     private def sameApplyName(tree : Tree, name : String) : Boolean = extractByApplyName(tree, name).nonEmpty
+
+    private def uncurry(apply : Apply, uncurryTimes : Int): Apply = (uncurryTimes,apply) match {
+      case (0,_) => apply
+      case (n, Apply(fun : Apply, _)) => uncurry(fun, n - 1)
+      case _ => apply
+    }
   }
 }
 
@@ -106,5 +116,9 @@ object TypeCheckComponent extends ComponentDescriptor[TypeCheckComponent] {
 
   val repErrorString : String = "error, first value of rep must be local, not field"
 
-  val zeroPosition : Int = 0
+  val firstArg : Int = 0
+
+  val curryingFoldTimes : Int = 2
+
+  val curryingRepTimes : Int = 1
 }

@@ -4,9 +4,9 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class NbrTest extends StandardTest(true) {
+class NbrTest extends PluginTest(false) {
   import TypeCheckComponent._
-  "the plugin" should "raise an error if there are nested nbr" in {
+  "Scafi plugin" should "raise an error if there are nested nbr" in {
     val nestedNbr = compiler.compile(
       writeInMain(
         """
@@ -36,7 +36,7 @@ class NbrTest extends StandardTest(true) {
     hideNestedNbr.errors.contains(nbrNestedErrorString) shouldBe true
   }
 
-  "the plugin" should "allow normal usage of nbr" in {
+  "Scafi plugin" should "allow normal usage of nbr" in {
     val standardNbr = compiler.compile(
       writeInMain(
         """

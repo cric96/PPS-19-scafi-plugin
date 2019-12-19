@@ -4,9 +4,9 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class IfCheckTest extends StandardTest {
+class IfCheckTest extends PluginTest {
   import TypeCheckComponent._
-  "Scafi pluging" should "check if presence in main" in {
+  "Scafi plugin" should "check if presence in main" in {
     val reportSingleIf = compiler.compile(writeInMain {
        """
          |val x = 10
@@ -31,7 +31,7 @@ class IfCheckTest extends StandardTest {
     reportMultipleIf.warnings.count(_ == ifInfoString) shouldBe 2
   }
 
-  "Scafi pluging" should "check if presence only aggregate main" in {
+  "Scafi plugin" should "check if presence only aggregate main" in {
     val report = compiler.compile{
       """
         | class AClass {

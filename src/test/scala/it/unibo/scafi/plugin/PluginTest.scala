@@ -2,7 +2,7 @@ package it.unibo.scafi.plugin
 
 import org.scalatest.{BeforeAndAfterEach, FlatSpec, Matchers}
 
-class StandardTest(verbose : Boolean = false) extends FlatSpec with BeforeAndAfterEach with Matchers{
+class PluginTest(verbose : Boolean = false) extends FlatSpec with BeforeAndAfterEach with Matchers{
   protected var compiler : ScafiCompilerPlatform = _
   override def beforeEach(): Unit = {
     compiler = new ScafiCompilerPlatform(verbose)
@@ -14,6 +14,7 @@ class StandardTest(verbose : Boolean = false) extends FlatSpec with BeforeAndAft
      |trait AggregateProgram extends ProgramSchema {
      |  def nbr[A](expr: => A): A = expr
      |  def foldhood[A](init: => A)(aggr: (A, A) => A)(expr: => A): A = expr
+     |  def rep[A](init: =>A)(fun: (A) => A): A = init
      |}
     """.stripMargin
 
