@@ -2,34 +2,10 @@ package it.unibo.scafi.plugin
 
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{BeforeAndAfterEach, FlatSpec, Matchers}
 
 @RunWith(classOf[JUnitRunner])
-class ScafiTypeCheckTest extends FlatSpec with BeforeAndAfterEach with Matchers {
-  var compiler : ScafiCompilerPlatform = _
+class IfCheckTest extends StandardTest {
   import TypeCheckComponent._
-
-  override def beforeEach(): Unit = {
-    compiler = new ScafiCompilerPlatform(false)
-  }
-
-  val commonCode =
-    """
-      |trait ProgramSchema
-      |trait AggregateProgram extends ProgramSchema
-    """.stripMargin
-
-  def writeInMain(mainBody : String) = {
-    s"""
-      $commonCode
-       class Main extends ProgramSchema {
-          def main(x : Int) : Unit = {
-            $mainBody
-          }
-        }
-    """.stripMargin
-  }
-
   "Scafi pluging" should "check if presence in main" in {
     val reportSingleIf = compiler.compile(writeInMain {
        """

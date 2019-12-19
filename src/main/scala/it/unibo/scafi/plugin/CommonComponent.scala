@@ -10,6 +10,7 @@ abstract class CommonComponent(protected val context : ComponentContext) extends
   override val global: Global = context.global
   import global._
 
+  protected def hasSameName(symbol : Symbol, name : String) : Boolean = symbol.name.containsName(name)
   /**
     * return the symbol from tree if certain condition are satisfied.
     * @param tree : object where check the condition passed
@@ -25,7 +26,7 @@ abstract class CommonComponent(protected val context : ComponentContext) extends
     * @param tree: the root where check the conditions
     */
   protected def isAggregateProgram(tree : Tree) : Boolean = {
-    def containsAggregateName(name : Symbol#NameType) : Boolean = name.containsName(context.names.aggregateProgram)
+    def containsAggregateName(name : Symbol) : Boolean = hasSameName(name, context.names.aggregateProgram)
 
     val symbol = extractSymbolIf(tree, {
       case ClassDef(_,_,_,_) => true
@@ -34,7 +35,6 @@ abstract class CommonComponent(protected val context : ComponentContext) extends
     })
 
     symbol.map(_.baseClasses)
-      .map(classes => classes.map(_.name))
       .map(classNames => classNames.filter(containsAggregateName))
       .nonEmpty
   }

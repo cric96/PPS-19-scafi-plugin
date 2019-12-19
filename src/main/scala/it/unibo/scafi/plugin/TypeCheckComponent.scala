@@ -11,6 +11,7 @@ import scala.tools.nsc.Phase
   */
 class TypeCheckComponent(context : ComponentContext) extends CommonComponent(context) {
   import global._
+  import TypeCheckComponent._
   override val phaseName: String = TypeCheckComponent.name
   override val runsAfter: List[String] = List("refchecks")
 
@@ -42,15 +43,53 @@ class TypeCheckComponent(context : ComponentContext) extends CommonComponent(con
     private def evalAggregateMain(tree : Tree) : Unit = {
       //in this def, there are all the checking in the programs
       ifPresenceCheck(tree)
+      nbrNestedCheck(tree)
+      foldhoodAndRepCorrectness(tree)
     }
 
-    def ifPresenceCheck(tree : Tree): Unit = tree match {
+    private def ifPresenceCheck(tree : Tree): Unit = tree match {
       case If(_,_,_) =>
-        global.reporter.warning(tree.pos, TypeCheckComponent.ifInfoString)
+        global.reporter.warning(tree.pos, ifInfoString)
         tree.children.foreach(ifPresenceCheck)
       case _ =>
         tree.children.foreach(ifPresenceCheck)
     }
+
+    private def nbrNestedCheck(tree : Tree) : Unit = {
+      if(isNbr(tree) && tree.children.exists(checkNbrPresence)) {
+        global.reporter.error(tree.pos, nbrNestedErrorString)
+      } else {
+        tree.children.foreach(nbrNestedCheck)
+      }
+    }
+
+    private def checkNbrPresence(tree : Tree) : Boolean = if (isNbr(tree)) {
+      println(tree)
+      true
+    } else {
+      tree.children.exists(checkNbrPresence)
+    }
+
+    private def isNbr(tree : Tree) : Boolean = sameApplyName(tree, context.names.nbr)
+
+    private def foldhoodAndRepCorrectness(tree : Tree) : Unit = {
+      val foldHoodApply = extractByApplyName(tree, context.names.hood)
+      val repApply = extractByApplyName(tree, context.names.rep)
+      (foldHoodApply, repApply) match {
+        case (Some(apply), None) => if(checkNbrPresence(apply.args(zeroPosition)))
+          global.reporter.error(tree.pos, nbrNestedErrorString)
+        case (None, Some(apply)) => if(checkNbrPresence(apply.args(zeroPosition)))
+          global.reporter.error(tree.pos, nbrNestedErrorString)
+        case _ => tree.children.foreach{foldhoodAndRepCorrectness}
+      }
+    }
+
+    private def extractByApplyName(tree : Tree, name: String) : Option[Apply] = tree match {
+      case res : Apply if hasSameName(tree.symbol, name) => Some(res)
+      case _ => None
+    }
+
+    private def sameApplyName(tree : Tree, name : String) : Boolean = extractByApplyName(tree, name).nonEmpty
   }
 }
 
@@ -60,4 +99,12 @@ object TypeCheckComponent extends ComponentDescriptor[TypeCheckComponent] {
   override def apply()(implicit c: ComponentContext): TypeCheckComponent = new TypeCheckComponent(c)
 
   val ifInfoString : String = "if not allowed in aggregate main"
+
+  val nbrNestedErrorString : String = "error, nbr of nbr not allowed in aggregate main"
+
+  val foldHoodErrorString : String = "error, first value of foldhood must be local, not field"
+
+  val repErrorString : String = "error, first value of rep must be local, not field"
+
+  val zeroPosition : Int = 0
 }

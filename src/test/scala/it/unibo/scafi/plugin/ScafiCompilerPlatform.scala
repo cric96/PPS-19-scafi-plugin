@@ -12,35 +12,41 @@ class ScafiCompilerPlatform(verbose : Boolean) {
   settings.outputDirs.setSingleOutput(virtualDir) //all compile source are store in memory
   //TODO find a more powerful way to avoid problems with sbt, the problems is the java.class.path values!
   settings.usejavacp.value = true //used to find the scala compiler by the global
-  //report creation, used to retrive warning, error and info
-  private val reporter = new DebuggerReporter(settings)
-  //compiler creation, where the magic happens
-  val global = new Global(settings,reporter) {
-    override protected def computeInternalPhases () {
-      super.computeInternalPhases
-      //add the phase added on this module
-      for (phase <- new ScafiDSLPlugin(this).components)
-        phasesSet += phase
+  //create global, attach the new plugin phases, using a report to check error and warning
+  private def createGlobal(report : AbstractReporter) : Global = {
+    new Global(settings,report) {
+      override protected def computeInternalPhases () {
+        super.computeInternalPhases
+        //add the phase added on this module
+        for (phase <- new ScafiDSLPlugin(this).components)
+          phasesSet += phase
+      }
     }
   }
-  //create compiler
 
+  /**
+    * compile a scala code passed as a string
+    * @param code: the scala code.
+    * @return the compilation's report with the code generated, the error, warning and info count produced by
+    *         the compiler (with the scafi plugin injected)
+    */
   def compile(code : String) : CompilationReport = {
+    val reporter = new DebuggerReporter(settings)
+    val global = createGlobal(reporter)
     val compilation  = new global.Run()
     val sources = List(createFromString(code))
     compilation.compileSources(sources)
     //a way to check code after a phase is to used compiltation.units
     try {
-      this.reporter.report().appendCode(compilation.units.map(_.body.toString()))
+      reporter.report().appendCode(compilation.units.map(_.body.toString()))
     } finally {
-      this.reporter.clearOutputCount()
+      reporter.clearOutputCount()
     }
   }
 
 
   private def createFromString(code : String) : BatchSourceFile = new BatchSourceFile("<test>",code)
 }
-
 case class CompilationReport(errors : List[String],
                              warnings: List[String],
                              info : List[String],
