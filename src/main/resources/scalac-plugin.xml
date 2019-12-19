@@ -1,0 +1,4 @@
+<plugin>
+    <name>scafiplugin</name>
+    <classname>it.unibo.scafi.plugin.ScafiDSLPlugin</classname>
+</plugin>
