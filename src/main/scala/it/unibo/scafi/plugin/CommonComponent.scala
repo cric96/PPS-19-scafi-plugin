@@ -10,7 +10,10 @@ abstract class CommonComponent(protected val context : ComponentContext) extends
   override val global: Global = context.global
   import global._
 
-  protected def hasSameName(symbol : Symbol, name : String) : Boolean = symbol.name.containsName(name)
+  protected def hasSameName(symbol : Symbol, name : String) : Boolean = {
+    //TODO! it is the right way to check name ??
+    symbol.nameString == name
+  }
   /**
     * return the symbol from tree if certain condition are satisfied.
     * @param tree : object where check the condition passed

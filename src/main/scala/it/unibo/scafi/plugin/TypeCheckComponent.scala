@@ -72,7 +72,7 @@ class TypeCheckComponent(context : ComponentContext) extends CommonComponent(con
     private def foldhoodAndRepCorrectness(tree : Tree) : Unit = {
       val foldHoodApply = extractByApplyName(tree, context.names.hood)
       val repApply = extractByApplyName(tree, context.names.rep)
-      //TODO make more readable
+
       (foldHoodApply, repApply) match {
         case (Some(apply), None) =>
           val uncurried = uncurry(apply, curryingFoldTimes)
