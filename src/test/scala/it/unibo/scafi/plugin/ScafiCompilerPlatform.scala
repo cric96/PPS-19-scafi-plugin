@@ -1,5 +1,9 @@
 package it.unibo.scafi.plugin
 
+import java.io.File
+import java.net.{URL, URLClassLoader}
+import java.nio.file.Files
+
 import scala.reflect.internal.util.{BatchSourceFile, Position}
 import scala.tools.nsc.io.VirtualDirectory
 import scala.tools.nsc.reporters.AbstractReporter
@@ -7,12 +11,14 @@ import scala.tools.nsc.{Global, Settings}
 
 class ScafiCompilerPlatform(verbose : Boolean) {
   private val settings = new Settings() //setting used to create the context of compiler
+  settings.embeddedDefaults(this.getClass.getClassLoader)
   settings.verbose.value = verbose
   private val virtualDir = new VirtualDirectory("(memory)", None)
   settings.outputDirs.setSingleOutput(virtualDir) //all compile source are store in memory
   //TODO find a more powerful way to avoid problems with sbt, the problems is the java.class.path values!
-  settings.usejavacp.value = true //used to find the scala compiler by the global
-  //create global, attach the new plugin phases, using a report to check error and warning
+  //settings.classpath.value = System.getProperty("java.class.path")//create global, attach the new plugin phases, using a report to check error and warning
+  settings.usejavacp.value = true
+  settings.Ylogcp.value = true
   private def createGlobal(report : AbstractReporter) : Global = {
     new Global(settings,report) {
       override protected def computeInternalPhases () {
@@ -78,4 +84,41 @@ class DebuggerReporter(override val settings: Settings) extends AbstractReporter
   }
 
   def report() : CompilationReport = CompilationReport(outputMap(ERROR.id), outputMap(WARNING.id), outputMap(INFO.id))
+}
+
+final class ReplClassloader(parent: ClassLoader) extends ClassLoader(parent)  {
+  override def getResource(name: String): URL = {
+    // Rather pass `settings.usejavacp.value = true` (which doesn't work
+    // under SBT) we do the same as SBT and respond to a resource request
+    // by the compiler for the magic name "app.classpath", write the JAR files
+    // from our classloader to a temporary file, and return that as the resource.
+    if (name == "app.class.path") {
+      def writeTemp(content: String): File = {
+        val f = File.createTempFile("classpath", ".txt")
+        //          IO.writeFile(f, content)
+        val p = new java.io.PrintWriter(f)
+        p.print(content)
+        p.close
+        f
+      }
+      println("Attempting to configure Scala classpath based on classloader: " + getClass.getClassLoader)
+      val superResource = super.getResource(name)
+      if (superResource != null) superResource // In SBT, let it do it's thing
+      else getClass.getClassLoader match {
+        case u: URLClassLoader =>
+          // Rather pass `settings.usejavacp.value = true` (which doesn't work
+          // under SBT) we do the same as SBT and respond to a resource request
+          // by the compiler for the magic name "app.classpath"
+          println("yay...")
+          val files = u.getURLs.map(x => new java.io.File(x.toURI))
+          val f = writeTemp(files.mkString(File.pathSeparator))
+          println(Files.readAllLines(f.toPath))
+          f.toURI.toURL
+        case other =>
+          // We're hosed here.
+          println("uh-oh")
+          null
+      }
+    } else super.getResource(name)
+  }
 }
