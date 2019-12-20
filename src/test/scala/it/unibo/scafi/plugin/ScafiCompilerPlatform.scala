@@ -15,10 +15,7 @@ class ScafiCompilerPlatform(verbose : Boolean) {
   settings.verbose.value = verbose
   private val virtualDir = new VirtualDirectory("(memory)", None)
   settings.outputDirs.setSingleOutput(virtualDir) //all compile source are store in memory
-  //TODO find a more powerful way to avoid problems with sbt, the problems is the java.class.path values!
-  //settings.classpath.value = System.getProperty("java.class.path")//create global, attach the new plugin phases, using a report to check error and warning
   settings.usejavacp.value = true
-  settings.Ylogcp.value = true
   private def createGlobal(report : AbstractReporter) : Global = {
     new Global(settings,report) {
       override protected def computeInternalPhases () {
