@@ -1,7 +1,9 @@
 package it.unibo.scafi.plugin
 
+import scala.annotation.StaticAnnotation
 import scala.tools.nsc.Phase
 
+class F extends StaticAnnotation
 /**
   * check if, in the aggregate program (or in constructor definition(*?*)) certain
   * properties are satisfied. Examples of properties are:
@@ -38,7 +40,6 @@ class TypeCheckComponent(context : ComponentContext) extends CommonComponent(con
         evalAggregateMain  //here starts program evaluation
       }
     }
-
     private def evalAggregateMain(tree : Tree) : Unit = {
       //in this def, there are all the checking in the programs
       ifPresenceCheck(tree)

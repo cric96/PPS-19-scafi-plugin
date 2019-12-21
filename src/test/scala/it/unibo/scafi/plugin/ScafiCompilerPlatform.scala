@@ -47,19 +47,16 @@ class ScafiCompilerPlatform(verbose : Boolean) {
       reporter.clearOutputCount()
     }
   }
-
-
-  private def createFromString(code : String) : BatchSourceFile = new BatchSourceFile("<test>",code)
 }
 case class CompilationReport(errors : List[String],
                              warnings: List[String],
                              info : List[String],
                              code : List[String] = List()) {
-  def hasErrors = errors.nonEmpty
+  def hasErrors : Boolean = errors.nonEmpty
 
-  def hasWarnings = warnings.nonEmpty
+  def hasWarnings : Boolean = warnings.nonEmpty
 
-  def hasInfo = info.nonEmpty
+  def hasInfo : Boolean = info.nonEmpty
 
   def appendCode(compiledCode : Iterator[String]) : CompilationReport = this.copy(code = compiledCode.toList)
 }
@@ -77,9 +74,8 @@ class DebuggerReporter(override val settings: Settings) extends AbstractReporter
 
   override def displayPrompt(): Unit = { }
 
-  def clearOutputCount(): Unit = {
-    outputMap = initInfoMap()
-  }
+  def clearOutputCount(): Unit = outputMap = initInfoMap()
+
 
   def report() : CompilationReport = CompilationReport(outputMap(ERROR.id), outputMap(WARNING.id), outputMap(INFO.id))
 }

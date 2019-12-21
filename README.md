@@ -1,4 +1,4 @@
-# PPS-19, Scafi compiler plugin
+# PPS-19, Scafi compiler plugin ![](https://github.com/cric96/PPS-19-scafi-plugin/workflows/.github/workflows/scala.yml/badge.svg)
 ## How to write a compiler plugin?
 
 [comment]: <> "TODO, write the main concept, add useful link"
