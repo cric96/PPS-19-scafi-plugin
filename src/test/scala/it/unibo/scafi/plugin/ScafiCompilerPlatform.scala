@@ -15,7 +15,8 @@ class ScafiCompilerPlatform(verbose : Boolean) {
   settings.verbose.value = verbose
   private val virtualDir = new VirtualDirectory("(memory)", None)
   settings.outputDirs.setSingleOutput(virtualDir) //all compile source are store in memory
-  settings.usejavacp.value = true
+  settings.usejavacp.value = true //used to find the scala compiler by the global
+  //create global, attach the new plugin phases, using a report to check error and warning
   private def createGlobal(report : AbstractReporter) : Global = {
     new Global(settings,report) {
       override protected def computeInternalPhases () {
@@ -37,7 +38,7 @@ class ScafiCompilerPlatform(verbose : Boolean) {
     val reporter = new DebuggerReporter(settings)
     val global = createGlobal(reporter)
     val compilation  = new global.Run()
-    val sources = List(createFromString(code))
+    val sources = List(global.newSourceFile(code))
     compilation.compileSources(sources)
     //a way to check code after a phase is to used compiltation.units
     try {

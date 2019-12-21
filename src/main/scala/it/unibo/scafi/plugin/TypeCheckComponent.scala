@@ -24,8 +24,7 @@ class TypeCheckComponent(context : ComponentContext) extends CommonComponent(con
     override def name = TypeCheckComponent.this.phaseName
     //here the magic happens, verify the correctness of the programs
     override def apply(unit: CompilationUnit): Unit = {
-      global.reporter.echo(phaseName)
-
+      global.inform(phaseName)
       def extractMain(tree : Tree) : Option[Tree] = tree match {
         case DefDef(_,name,_,_,_,_) if name.containsName("main") => Some(tree)
         case _ => tree.children.map(extractMain).collectFirst {
@@ -49,7 +48,7 @@ class TypeCheckComponent(context : ComponentContext) extends CommonComponent(con
 
     private def ifPresenceCheck(tree : Tree): Unit = tree match {
       case If(_,_,_) =>
-        global.reporter.warning(tree.pos, ifInfoString)
+        warning(tree.pos, ifInfoString)
         tree.children.foreach(ifPresenceCheck)
       case _ =>
         tree.children.foreach(ifPresenceCheck)
@@ -57,7 +56,7 @@ class TypeCheckComponent(context : ComponentContext) extends CommonComponent(con
 
     private def nbrNestedCheck(tree : Tree) : Unit = extractByApplyName(tree, context.names.nbr) match {
       case Some(apply) => if(apply.args(firstArg).exists(nbrPresence))
-        global.reporter.error(tree.pos, nbrNestedErrorString)
+        globalError(tree.pos, nbrNestedErrorString)
       case _ =>  tree.children.foreach(nbrNestedCheck)
     }
 
@@ -77,12 +76,12 @@ class TypeCheckComponent(context : ComponentContext) extends CommonComponent(con
         case (Some(apply), None) =>
           val uncurried = uncurry(apply, curryingFoldTimes)
           if(nbrPresence(uncurried.args(firstArg))) {
-            global.reporter.error(tree.pos, foldHoodErrorString)
+            globalError(tree.pos, foldHoodErrorString)
           }
         case (None, Some(apply)) =>
           val uncurried = uncurry(apply, curryingRepTimes)
           if(nbrPresence(uncurried.args(firstArg))) {
-            global.reporter.error(tree.pos, repErrorString)
+            globalError(tree.pos, repErrorString)
           }
         case _ => tree.children.foreach{foldhoodAndRepCorrectness}
       }
