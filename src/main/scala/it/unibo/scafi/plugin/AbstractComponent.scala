@@ -1,12 +1,14 @@
 package it.unibo.scafi.plugin
 
+import it.unibo.scafi.definition.AggregateFunction
+
 import scala.tools.nsc.Global
 import scala.tools.nsc.plugins.PluginComponent
 /**
   * abstract plugin component, define general structure of scafi plugin components,
   * has some utility function that could be used in the child components.
   */
-abstract class CommonComponent(protected val context : ComponentContext) extends PluginComponent {
+abstract class AbstractComponent(protected val context : ComponentContext) extends PluginComponent {
   override val global: Global = context.global
   import global._
 
@@ -29,8 +31,7 @@ abstract class CommonComponent(protected val context : ComponentContext) extends
     * @param tree: the root where check the conditions
     */
   protected def isAggregateProgram(tree : Tree) : Boolean = {
-    def containsAggregateName(name : Symbol) : Boolean = hasSameName(name, context.names.aggregateProgram)
-
+    def containsAggregateName(name : Symbol) : Boolean = hasSameName(name, context.main)
     val symbol = extractSymbolIf(tree, {
       case ClassDef(_,_,_,_) => true
       case ModuleDef(_,_,_) => true
@@ -42,6 +43,12 @@ abstract class CommonComponent(protected val context : ComponentContext) extends
       .nonEmpty
   }
 
+  protected def isAggregateFunction(tree : Tree) : Boolean = context.aggregateFunctions.contains(tree.symbol.nameString)
+
+  protected def extractAggregateFunction(tree : Tree) : Option[AggregateFunction] = tree.symbol match {
+    case null => None
+    case _ => context.aggregateFunctions.get(tree.symbol.nameString)
+  }
   /**
     * extract all aggregate programs from a tree
     * @param tree: the structure where extract aggregate programs
@@ -55,9 +62,10 @@ abstract class CommonComponent(protected val context : ComponentContext) extends
     }
   }
 }
+
 /**
   * the context of the scafi plugin component
   * @param global: the context of compilation
-  * @param names: the main name used in the scafi programs (constructor, class, function)
+  * @param aggregateFunctions: the set of aggregate function to consider during this compilation.
   */
-case class ComponentContext(global : Global, names : ScafiNames)
+case class ComponentContext(global : Global, main : String, aggregateFunctions : Map[String, AggregateFunction])

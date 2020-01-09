@@ -1,9 +1,8 @@
 package it.unibo.scafi.plugin
 
-import scala.annotation.StaticAnnotation
+import it.unibo.scafi.definition.{AggregateFunction, AggregateType, F, L}
 import scala.tools.nsc.Phase
 
-class F extends StaticAnnotation
 /**
   * check if, in the aggregate program (or in constructor definition(*?*)) certain
   * properties are satisfied. Examples of properties are:
@@ -11,9 +10,9 @@ class F extends StaticAnnotation
   *   - type checking in the aggregate constructor ( nbr(nbr(x)) mustn't compile
   *   - ...
   */
-class TypeCheckComponent(context : ComponentContext) extends CommonComponent(context) {
-  import global._
+class TypeCheckComponent(context : ComponentContext) extends AbstractComponent(context) {
   import TypeCheckComponent._
+  import global._
   override val phaseName: String = TypeCheckComponent.name
   override val runsAfter: List[String] = List("refchecks")
 
@@ -43,8 +42,7 @@ class TypeCheckComponent(context : ComponentContext) extends CommonComponent(con
     private def evalAggregateMain(tree : Tree) : Unit = {
       //in this def, there are all the checking in the programs
       ifPresenceCheck(tree)
-      nbrNestedCheck(tree)
-      foldhoodAndRepCorrectness(tree)
+      aggregateFunctionCorrectness(tree)
     }
 
     private def ifPresenceCheck(tree : Tree): Unit = tree match {
@@ -55,46 +53,34 @@ class TypeCheckComponent(context : ComponentContext) extends CommonComponent(con
         tree.children.foreach(ifPresenceCheck)
     }
 
-    private def nbrNestedCheck(tree : Tree) : Unit = extractByApplyName(tree, context.names.nbr) match {
-      case Some(apply) => if(apply.args(firstArg).exists(nbrPresence))
-        globalError(tree.pos, nbrNestedErrorString)
-      case _ =>  tree.children.foreach(nbrNestedCheck)
+    private def aggregateFunctionCorrectness(tree : Tree) : Unit = (tree, extractAggregateFunction(tree)) match {
+      case (apply : Apply, Some(ag)) => checkAggFunCorrectness(ag, apply)
+      case _ => tree.children.foreach(aggregateFunctionCorrectness)
     }
 
-    private def nbrPresence(tree : Tree) : Boolean = if (isNbr(tree)) {
-      true
-    } else {
-      tree.children.exists(nbrPresence)
+    private def checkAggFunCorrectness(function : AggregateFunction, applyTree : Apply) = {
+      val blockWithArgTree = function.argsReversed
+                                  .zipWithIndex
+                                  .map { case (block, i) => block -> uncurry(applyTree, i).args}
+      blockWithArgTree
+        .flatMap { case (block, argsTree) => block.zip(argsTree) }
+        .foreach { case (aggType, argTree) => checkArgsCorrectness(function, aggType, argTree)}
     }
-
-    private def isNbr(tree : Tree) : Boolean = sameApplyName(tree, context.names.nbr)
-
-    private def foldhoodAndRepCorrectness(tree : Tree) : Unit = {
-      val foldHoodApply = extractByApplyName(tree, context.names.hood)
-      val repApply = extractByApplyName(tree, context.names.rep)
-
-      (foldHoodApply, repApply) match {
-        case (Some(apply), None) =>
-          val uncurried = uncurry(apply, curryingFoldTimes)
-          if(nbrPresence(uncurried.args(firstArg))) {
-            globalError(tree.pos, foldHoodErrorString)
-          }
-        case (None, Some(apply)) =>
-          val uncurried = uncurry(apply, curryingRepTimes)
-          if(nbrPresence(uncurried.args(firstArg))) {
-            globalError(tree.pos, repErrorString)
-          }
-        case _ => tree.children.foreach{foldhoodAndRepCorrectness}
+    //TODO Think how you can add index in error.
+    private def checkArgsCorrectness(fun : AggregateFunction, aggType : AggregateType, argTree : Tree) = {
+      aggType match {
+        case F if !isFieldPresent(argTree) => globalError(aggregateTypeError(fun, F, L))
+        case L if isFieldPresent(argTree) => globalError(aggregateTypeError(fun, L, F))
+        case _ =>
       }
+      argTree.children.foreach(aggregateFunctionCorrectness)
     }
 
-    private def extractByApplyName(tree : Tree, name: String) : Option[Apply] = tree match {
-      case res : Apply if hasSameName(tree.symbol, name) => Some(res)
-      case _ => None
+    private def isFieldPresent(tree : Tree) : Boolean = {
+      tree.children.map(extractAggregateFunction)
+        .collect { case Some(aggFun) => aggFun }
+        .exists(_.returns == F)
     }
-
-    private def sameApplyName(tree : Tree, name : String) : Boolean = extractByApplyName(tree, name).nonEmpty
-
     private def uncurry(apply : Apply, uncurryTimes : Int): Apply = (uncurryTimes,apply) match {
       case (0,_) => apply
       case (n, Apply(fun : Apply, _)) => uncurry(fun, n - 1)
@@ -108,17 +94,8 @@ object TypeCheckComponent extends ComponentDescriptor[TypeCheckComponent] {
 
   override def apply()(implicit c: ComponentContext): TypeCheckComponent = new TypeCheckComponent(c)
 
+  def aggregateTypeError(fun : AggregateFunction, expected : AggregateType, found : AggregateType) : String = {
+    s"$fun wrong type: expected $expected but found $found"
+  }
   val ifInfoString : String = "if not allowed in aggregate main"
-
-  val nbrNestedErrorString : String = "error, nbr of nbr not allowed in aggregate main"
-
-  val foldHoodErrorString : String = "error, first value of foldhood must be local, not field"
-
-  val repErrorString : String = "error, first value of rep must be local, not field"
-
-  val firstArg : Int = 0
-
-  val curryingFoldTimes : Int = 2
-
-  val curryingRepTimes : Int = 1
 }

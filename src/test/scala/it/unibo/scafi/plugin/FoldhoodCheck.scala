@@ -1,11 +1,13 @@
 package it.unibo.scafi.plugin
-
+import it.unibo.scafi.definition.AggregateFunction._
+import it.unibo.scafi.definition._
 import it.unibo.scafi.plugin.TypeCheckComponent._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class FoldhoodCheck extends PluginTest {
+  val foldhoodSig = aggFun("foldhood", L, args(block(L), block(T), block(T)))
   "Scafi plugin" should "raise an error if there is field value in foldhood" in {
     val report = compiler.compile(writeInMain {
       """
@@ -13,7 +15,7 @@ class FoldhoodCheck extends PluginTest {
       """.stripMargin
     })
     report.hasErrors shouldBe true
-    report.errors.contains(foldHoodErrorString) shouldBe true
+    report.errors.contains(aggregateTypeError(foldhoodSig, L, F)) shouldBe true
   }
   "Scafi plugin" should "work as usual with foldhood" in {
     val report = compiler.compile(writeInMain {

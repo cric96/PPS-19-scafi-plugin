@@ -1,5 +1,7 @@
 package it.unibo.scafi.plugin
 
+import it.unibo.scafi.definition.{AggregateFunction, F, L, T}
+
 import scala.tools.nsc.Global
 import scala.tools.nsc.plugins.{Plugin, PluginComponent}
 
@@ -15,16 +17,21 @@ class ScafiDSLPlugin(val global: Global) extends Plugin {
   //global include all compile time information.
   implicit val g: Global = global
   //the term used to check and find the properties of aggregate program
-  private val commonTerm = ScafiNames("ProgramSchema", "foldhood", "nbr", "rep")
+  import AggregateFunction._
+  private val coreFunction = AggregateFunction.toMap(
+    aggFun("nbr", returns = F, args(block(L))),
+    aggFun("foldhood", returns = L, args(block(L), block(T), block(T))),
+    aggFun("rep", returns = L, args(block(L), block(T)))
+  )
+
   //the context used in all plugin components.
-  implicit val componentContext : ComponentContext = ComponentContext(g, commonTerm)
+  implicit val componentContext : ComponentContext = ComponentContext(g, "ProgramSchema", coreFunction)
   override val name: String = "scafiplugin"
   override lazy val components: List[PluginComponent] = List(
     TransformComponent(),
     TypeCheckComponent()
   )
   override val description: String = "check the type correctness of aggregate program and transform the program (if needed)"
-
 
   override def processOptions(options: List[String], error: String => Unit): Unit = {
     for (option <- options) {

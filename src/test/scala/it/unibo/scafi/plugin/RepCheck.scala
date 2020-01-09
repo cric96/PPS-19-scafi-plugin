@@ -1,11 +1,15 @@
 package it.unibo.scafi.plugin
 
+import it.unibo.scafi.definition.AggregateFunction.{aggFun, args, block}
+import it.unibo.scafi.definition.{L, T, F}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class RepCheck extends PluginTest {
   import TypeCheckComponent._
+  val repSig = aggFun("rep", returns = L, args(block(L), block(T)))
+
   "Scafi plugin" should "raise an error if there is field value in rep" in {
     val report = compiler.compile(writeInMain {
       """
@@ -13,7 +17,7 @@ class RepCheck extends PluginTest {
       """.stripMargin
     })
     report.hasErrors shouldBe true
-    report.errors.contains(repErrorString) shouldBe true
+    report.errors.contains(aggregateTypeError(repSig, L, F)) shouldBe true
   }
   "Scafi plugin" should "work as usual with rep" in {
     val report = compiler.compile(writeInMain {
