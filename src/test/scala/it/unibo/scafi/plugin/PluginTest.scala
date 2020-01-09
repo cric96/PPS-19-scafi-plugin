@@ -15,6 +15,7 @@ class PluginTest(verbose : Boolean = false) extends FlatSpec with BeforeAndAfter
      |  def nbr[A](expr: => A): A = expr
      |  def foldhood[A](init: => A)(aggr: (A, A) => A)(expr: => A): A = expr
      |  def rep[A](init: =>A)(fun: (A) => A): A = init
+     |  def aggregate[A](f: => A) : A = f
      |}
     """.stripMargin
 

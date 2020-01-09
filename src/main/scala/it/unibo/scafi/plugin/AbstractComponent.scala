@@ -61,6 +61,7 @@ abstract class AbstractComponent(protected val context : ComponentContext) exten
       tree.children.flatMap(extractAggregatePrograms)
     }
   }
+
 }
 
 /**

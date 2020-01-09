@@ -6,7 +6,7 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class RepCheck extends PluginTest {
+class RepTest extends PluginTest {
   import TypeCheckComponent._
   val repSig = aggFun("rep", returns = L, args(block(L), block(T)))
 

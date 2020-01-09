@@ -6,6 +6,7 @@ import scala.tools.nsc.Global
 import scala.tools.nsc.plugins.{Plugin, PluginComponent}
 
 /**
+  * //TODO add discover phases: find all aggregate functions.
   * This plugin support compile-time checking in the aggregate programs.
   * It can change the program structure too.
   * The plugin has two different components:
@@ -20,7 +21,7 @@ class ScafiDSLPlugin(val global: Global) extends Plugin {
   import AggregateFunction._
   private val coreFunction = AggregateFunction.toMap(
     aggFun("nbr", returns = F, args(block(L))),
-    aggFun("foldhood", returns = L, args(block(L), block(T), block(T))),
+    aggFun("foldhood", returns = L, args(block(L), block(T), block(F))),
     aggFun("rep", returns = L, args(block(L), block(T)))
   )
 

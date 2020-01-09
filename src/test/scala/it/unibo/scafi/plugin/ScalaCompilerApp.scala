@@ -9,6 +9,5 @@ object ScalaCompilerApp extends App {
       |   val x : Int = 10
       | }
     """.stripMargin)
-
   println(report)
 }
