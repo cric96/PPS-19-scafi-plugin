@@ -10,7 +10,9 @@ class PluginTest(verbose : Boolean = false) extends FlatSpec with BeforeAndAfter
   /*NB! it is the correct way? it is better to depends on scafi-core? it is a good idea using annotations?*/
   protected val commonCode =
     """
-     |trait ProgramSchema
+     |trait ProgramSchema {
+     |  def main() : Unit
+     |}
      |trait AggregateProgram extends ProgramSchema {
      |  def nbr[A](expr: => A): A = expr
      |  def foldhood[A](init: => A)(aggr: (A, A) => A)(expr: => A): A = expr
@@ -23,7 +25,7 @@ class PluginTest(verbose : Boolean = false) extends FlatSpec with BeforeAndAfter
     s"""
       $commonCode
        class Main extends AggregateProgram {
-          def main(x : Int) : Unit = {
+          override def main() : Unit = {
             $mainBody
           }
         }

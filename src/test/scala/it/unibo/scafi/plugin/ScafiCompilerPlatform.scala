@@ -1,10 +1,6 @@
 package it.unibo.scafi.plugin
 
-import java.io.File
-import java.net.{URL, URLClassLoader}
-import java.nio.file.Files
-
-import scala.reflect.internal.util.{BatchSourceFile, Position}
+import scala.reflect.internal.util.Position
 import scala.tools.nsc.io.VirtualDirectory
 import scala.tools.nsc.reporters.AbstractReporter
 import scala.tools.nsc.{Global, Settings}
@@ -27,7 +23,9 @@ class ScafiCompilerPlatform(verbose : Boolean) {
       }
     }
   }
-
+  private def currentCompiled(run : Global#Run) : String = {
+    run.units.map(_.body.toString()).mkString("\n")
+  }
   /**
     * compile a scala code passed as a string
     * @param code: the scala code.
@@ -35,14 +33,18 @@ class ScafiCompilerPlatform(verbose : Boolean) {
     *         the compiler (with the scafi plugin injected)
     */
   def compile(code : String) : CompilationReport = {
+    var codeAtEachPhase = Map.empty[String, String]
     val reporter = new DebuggerReporter(settings)
     val global = createGlobal(reporter)
     val compilation  = new global.Run()
-    val sources = List(global.newSourceFile(code))
-    compilation.compileSources(sources)
+    val codeUnit = global.newCompilationUnit(code)
+    compilation.compileUnits(List(codeUnit), compilation.parserPhase)
+    global.afterEachPhase {
+      codeAtEachPhase += global.phase.name -> currentCompiled(compilation)
+    }
     //a way to check code after a phase is to used compiltation.units
     try {
-      reporter.report().appendCode(compilation.units.map(_.body.toString()))
+      reporter.report().appendCode(codeAtEachPhase)
     } finally {
       reporter.clearOutputCount()
     }
@@ -51,14 +53,14 @@ class ScafiCompilerPlatform(verbose : Boolean) {
 case class CompilationReport(errors : List[String],
                              warnings: List[String],
                              info : List[String],
-                             code : List[String] = List()) {
+                             code : Map[String, String] = Map()) {
   def hasErrors : Boolean = errors.nonEmpty
 
   def hasWarnings : Boolean = warnings.nonEmpty
 
   def hasInfo : Boolean = info.nonEmpty
 
-  def appendCode(compiledCode : Iterator[String]) : CompilationReport = this.copy(code = compiledCode.toList)
+  def appendCode(compiledCode : Map[String, String]) : CompilationReport = this.copy(code = compiledCode)
 }
 
 class DebuggerReporter(override val settings: Settings) extends AbstractReporter {
@@ -76,43 +78,5 @@ class DebuggerReporter(override val settings: Settings) extends AbstractReporter
 
   def clearOutputCount(): Unit = outputMap = initInfoMap()
 
-
   def report() : CompilationReport = CompilationReport(outputMap(ERROR.id), outputMap(WARNING.id), outputMap(INFO.id))
-}
-
-final class ReplClassloader(parent: ClassLoader) extends ClassLoader(parent)  {
-  override def getResource(name: String): URL = {
-    // Rather pass `settings.usejavacp.value = true` (which doesn't work
-    // under SBT) we do the same as SBT and respond to a resource request
-    // by the compiler for the magic name "app.classpath", write the JAR files
-    // from our classloader to a temporary file, and return that as the resource.
-    if (name == "app.class.path") {
-      def writeTemp(content: String): File = {
-        val f = File.createTempFile("classpath", ".txt")
-        //          IO.writeFile(f, content)
-        val p = new java.io.PrintWriter(f)
-        p.print(content)
-        p.close
-        f
-      }
-      println("Attempting to configure Scala classpath based on classloader: " + getClass.getClassLoader)
-      val superResource = super.getResource(name)
-      if (superResource != null) superResource // In SBT, let it do it's thing
-      else getClass.getClassLoader match {
-        case u: URLClassLoader =>
-          // Rather pass `settings.usejavacp.value = true` (which doesn't work
-          // under SBT) we do the same as SBT and respond to a resource request
-          // by the compiler for the magic name "app.classpath"
-          println("yay...")
-          val files = u.getURLs.map(x => new java.io.File(x.toURI))
-          val f = writeTemp(files.mkString(File.pathSeparator))
-          println(Files.readAllLines(f.toPath))
-          f.toURI.toURL
-        case other =>
-          // We're hosed here.
-          println("uh-oh")
-          null
-      }
-    } else super.getResource(name)
-  }
 }

@@ -8,10 +8,15 @@ import scala.tools.nsc.plugins.PluginComponent
   * abstract plugin component, define general structure of scafi plugin components,
   * has some utility function that could be used in the child components.
   */
-abstract class AbstractComponent(protected val context : ComponentContext) extends PluginComponent {
+abstract class AbstractComponent(protected val context : ComponentContext, protected val descriptor: ComponentDescriptor) extends PluginComponent {
   override val global: Global = context.global
   import global._
 
+  override val phaseName: String = descriptor.name
+
+  override val runsAfter: List[String] = descriptor.runsAfter
+
+  override val runsBefore: List[String] = descriptor.runsBefore
   protected def hasSameName(symbol : Symbol, name : String) : Boolean = {
     //TODO! it is the right way to check name ??
     symbol.nameString == name
@@ -43,25 +48,32 @@ abstract class AbstractComponent(protected val context : ComponentContext) exten
       .nonEmpty
   }
 
-  protected def isAggregateFunction(tree : Tree) : Boolean = context.aggregateFunctions.contains(tree.symbol.nameString)
+  def extractAggregateMain(tree : Tree) : Option[DefDef] = {
+    tree match {
+      case defMain : DefDef if defMain.name.endsWith("main") =>
+        defMain.mods match {
+          case Modifiers(Flag.OVERRIDE, _, _) => Some(defMain)
+          case _ => None
+        }
+      case _ => None
+    }
+  }
 
   protected def extractAggregateFunction(tree : Tree) : Option[AggregateFunction] = tree.symbol match {
     case null => None
     case _ => context.aggregateFunctions.get(tree.symbol.nameString)
   }
+
+  protected def extractAggregateProgram(tree : Tree) : Option[Tree] = Some(tree).filter(isAggregateProgram)
   /**
-    * extract all aggregate programs from a tree
+    * search all aggregate programs from a tree
     * @param tree: the structure where extract aggregate programs
     * @return list of aggregate programs if are defined, List.empty otherwise
     */
-  protected def extractAggregatePrograms(tree : Tree) : List[Tree] = {
-    if(isAggregateProgram(tree)) {
-      List(tree)
-    } else {
-      tree.children.flatMap(extractAggregatePrograms)
-    }
+  protected def searchAggregatePrograms(tree : Tree) : List[Tree] = extractAggregateProgram(tree) match {
+    case None => tree.children.flatMap(searchAggregatePrograms)
+    case Some(tree) => List(tree)
   }
-
 }
 
 /**

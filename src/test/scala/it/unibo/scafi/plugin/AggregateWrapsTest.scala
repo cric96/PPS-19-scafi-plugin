@@ -9,9 +9,11 @@ class AggregateWrapsTest extends PluginTest {
   "Scafi plugin" should "wraps lambda using aggregate" in {
     val report = compiler.compile(writeInMain {
       """
-        | foldhood{15}{(x,y) => x}{nbr(10)}
+        | foldhood{15}{(x,y) => {x;y}}{nbr(10)}
       """.stripMargin
     })
+    println(report.errors)
     report.hasErrors shouldBe false
+    println(report.code)
   }
 }

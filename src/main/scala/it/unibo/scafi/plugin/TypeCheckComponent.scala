@@ -10,12 +10,9 @@ import scala.tools.nsc.Phase
   *   - type checking in the aggregate constructor ( nbr(nbr(x)) mustn't compile
   *   - ...
   */
-class TypeCheckComponent(context : ComponentContext) extends AbstractComponent(context) {
+class TypeCheckComponent(context : ComponentContext) extends AbstractComponent(context, TypeCheckComponent) {
   import TypeCheckComponent._
   import global._
-  override val phaseName: String = TypeCheckComponent.name
-  override val runsAfter: List[String] = List("refchecks")
-
   override def newPhase(prev: Phase): Phase = new TypeCheckPhase(prev)
   /**
     * the phases used to check the type checking correctness.
@@ -26,14 +23,16 @@ class TypeCheckComponent(context : ComponentContext) extends AbstractComponent(c
     //here the magic happens, verify the correctness of the programs
     override def apply(unit: CompilationUnit): Unit = {
       global.inform(phaseName)
-      def extractMain(tree : Tree) : Option[Tree] = tree match {
-        case DefDef(_,name,_,_,_,_) if name.containsName("main") => Some(tree)
-        case _ => tree.children.map(extractMain).collectFirst {
-          case Some(childTree) => childTree
+
+      def searchMainBody(tree : Tree) : Option[Tree] = extractAggregateMain(tree) match {
+        case None => tree.children.map(searchMainBody).collectFirst {
+          case Some(mainBody) => mainBody
         }
+        case Some(defMain) => Some(defMain.rhs)
       }
+
       //extract all aggregate main, and check the properties
-      extractAggregatePrograms(unit.body).map(extractMain).collect {
+      searchAggregatePrograms(unit.body).map(searchMainBody).collect {
         case Some(mainTree) => mainTree
       } foreach {
         evalAggregateMain  //here starts program evaluation
@@ -87,10 +86,13 @@ class TypeCheckComponent(context : ComponentContext) extends AbstractComponent(c
       case _ => apply
     }
   }
+  override val descriptor: ComponentDescriptor = TypeCheckComponent
 }
 
-object TypeCheckComponent extends ComponentDescriptor[TypeCheckComponent] {
+object TypeCheckComponent extends ComponentDescriptor {
   override def name: String = "typecheck-aggregate"
+
+  override val runsAfter: List[String] = List("refchecks")
 
   override def apply()(implicit c: ComponentContext): TypeCheckComponent = new TypeCheckComponent(c)
 
