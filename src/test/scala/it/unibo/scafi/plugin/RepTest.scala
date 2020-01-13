@@ -1,7 +1,7 @@
 package it.unibo.scafi.plugin
 
 import it.unibo.scafi.definition.AggregateFunction.{aggFun, args, block}
-import it.unibo.scafi.definition.{L, T, F}
+import it.unibo.scafi.definition.{F, L, T}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
@@ -18,7 +18,9 @@ class RepTest extends PluginTest {
     })
     report.hasErrors shouldBe true
     report.errors.contains(aggregateTypeError(repSig, L, F)) shouldBe true
+    println(report.info)
   }
+
   "Scafi plugin" should "work as usual with rep" in {
     val report = compiler.compile(writeInMain {
       """

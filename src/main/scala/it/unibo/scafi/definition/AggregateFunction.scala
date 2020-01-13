@@ -1,6 +1,6 @@
 package it.unibo.scafi.definition
 
-import AggregateFunction._
+import it.unibo.scafi.definition.AggregateFunction._
 sealed trait AggregateType
 case object L extends AggregateType
 case object F extends AggregateType

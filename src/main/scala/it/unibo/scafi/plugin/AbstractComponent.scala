@@ -29,14 +29,7 @@ abstract class AbstractComponent(protected val context : ComponentContext, prote
     */
   protected def extractSymbolIf(tree : Tree, condition : Tree => Boolean) : Option[Symbol] = Some(tree).filter(condition).map(_.symbol)
 
-  /**
-    * verify if the root tree, is a aggregate program, it could be:
-    *   - a class definition that extends the trait name defined in scafi names.
-    *   - an object that extends the trait name defined in scafi names
-    * @param tree: the root where check the conditions
-    */
-  protected def isAggregateProgram(tree : Tree) : Boolean = {
-    def containsAggregateName(name : Symbol) : Boolean = hasSameName(name, context.main)
+  protected def extendsFromType(tree : Tree, typeName : String) : Boolean = {
     val symbol = extractSymbolIf(tree, {
       case ClassDef(_,_,_,_) => true
       case ModuleDef(_,_,_) => true
@@ -44,7 +37,7 @@ abstract class AbstractComponent(protected val context : ComponentContext, prote
     })
 
     symbol.map(_.baseClasses)
-      .map(classNames => classNames.filter(containsAggregateName))
+      .map(classNames => classNames.filter(hasSameName(_, typeName)))
       .nonEmpty
   }
 
@@ -59,20 +52,10 @@ abstract class AbstractComponent(protected val context : ComponentContext, prote
     }
   }
 
-  protected def extractAggregateFunction(tree : Tree) : Option[AggregateFunction] = tree.symbol match {
-    case null => None
-    case _ => context.aggregateFunctions.get(tree.symbol.nameString)
-  }
-
-  protected def extractAggregateProgram(tree : Tree) : Option[Tree] = Some(tree).filter(isAggregateProgram)
-  /**
-    * search all aggregate programs from a tree
-    * @param tree: the structure where extract aggregate programs
-    * @return list of aggregate programs if are defined, List.empty otherwise
-    */
-  protected def searchAggregatePrograms(tree : Tree) : List[Tree] = extractAggregateProgram(tree) match {
-    case None => tree.children.flatMap(searchAggregatePrograms)
-    case Some(tree) => List(tree)
+  protected def uncurry(apply : Apply, uncurryTimes : Int): Apply = (uncurryTimes,apply) match {
+    case (0,_) => apply
+    case (n, Apply(fun : Apply, _)) => uncurry(fun, n - 1)
+    case _ => apply
   }
 }
 
@@ -81,4 +64,7 @@ abstract class AbstractComponent(protected val context : ComponentContext, prote
   * @param global: the context of compilation
   * @param aggregateFunctions: the set of aggregate function to consider during this compilation.
   */
-case class ComponentContext(global : Global, main : String, aggregateFunctions : Map[String, AggregateFunction])
+case class ComponentContext(global : Global,
+                            aggregateProgram : String,
+                            constructs : String,
+                            aggregateFunctions : Map[String, AggregateFunction])

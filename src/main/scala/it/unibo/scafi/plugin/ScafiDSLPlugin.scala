@@ -26,11 +26,12 @@ class ScafiDSLPlugin(val global: Global) extends Plugin {
   )
 
   //the context used in all plugin components.
-  implicit val componentContext : ComponentContext = ComponentContext(g, "ProgramSchema", coreFunction)
+  implicit val componentContext : ComponentContext = ComponentContext(g, "ProgramSchema", "Constructs", coreFunction)
   override val name: String = "scafiplugin"
   override lazy val components: List[PluginComponent] = List(
     TransformComponent(),
-    TypeCheckComponent()
+    TypeCheckComponent(),
+    DiscoverComponent()
   )
   override val description: String = "check the type correctness of aggregate program and transform the program (if needed)"
 

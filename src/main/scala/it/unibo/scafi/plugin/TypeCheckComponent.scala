@@ -1,6 +1,7 @@
 package it.unibo.scafi.plugin
 
 import it.unibo.scafi.definition.{AggregateFunction, AggregateType, F, L}
+
 import scala.tools.nsc.Phase
 
 /**
@@ -19,7 +20,21 @@ class TypeCheckComponent(context : ComponentContext) extends AbstractComponent(c
     * @param prev the previous phase in the compilation pipeline
     */
   class TypeCheckPhase(prev: Phase) extends StdPhase(prev) {
-    override def name = TypeCheckComponent.this.phaseName
+    private def extractAggregateProgram(tree : Tree) : Option[Tree] = Some(tree).filter(extendsFromType(_, context.aggregateProgram))
+    /**
+      * search all aggregate programs from a tree
+      * @param tree: the structure where extract aggregate programs
+      * @return list of aggregate programs if are defined, List.empty otherwise
+      */
+    private def searchAggregatePrograms(tree : Tree) : List[Tree] = extractAggregateProgram(tree) match {
+      case None => tree.children.flatMap(searchAggregatePrograms)
+      case Some(tree) => List(tree)
+    }
+
+    private def extractAggregateFunction(tree : Tree) : Option[AggregateFunction] = tree.symbol match {
+      case null => None
+      case _ => context.aggregateFunctions.get(tree.symbol.nameString)
+    }
     //here the magic happens, verify the correctness of the programs
     override def apply(unit: CompilationUnit): Unit = {
       global.inform(phaseName)
@@ -80,24 +95,22 @@ class TypeCheckComponent(context : ComponentContext) extends AbstractComponent(c
         .collect { case Some(aggFun) => aggFun }
         .exists(_.returns == F)
     }
-    private def uncurry(apply : Apply, uncurryTimes : Int): Apply = (uncurryTimes,apply) match {
-      case (0,_) => apply
-      case (n, Apply(fun : Apply, _)) => uncurry(fun, n - 1)
-      case _ => apply
-    }
   }
   override val descriptor: ComponentDescriptor = TypeCheckComponent
 }
 
 object TypeCheckComponent extends ComponentDescriptor {
-  override def name: String = "typecheck-aggregate"
+  override def name: String = "scafi-typecheck"
 
-  override val runsAfter: List[String] = List("refchecks")
+  override val runsAfter: List[String] = List(DiscoverComponent.name)
+
+  override val runsBefore: List[String] = List("uncurry")
 
   override def apply()(implicit c: ComponentContext): TypeCheckComponent = new TypeCheckComponent(c)
 
   def aggregateTypeError(fun : AggregateFunction, expected : AggregateType, found : AggregateType) : String = {
     s"$fun wrong type: expected $expected but found $found"
   }
+
   val ifInfoString : String = "if not allowed in aggregate main"
 }

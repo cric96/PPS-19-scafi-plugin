@@ -33,34 +33,31 @@ class ScafiCompilerPlatform(verbose : Boolean) {
     *         the compiler (with the scafi plugin injected)
     */
   def compile(code : String) : CompilationReport = {
-    var codeAtEachPhase = Map.empty[String, String]
     val reporter = new DebuggerReporter(settings)
     val global = createGlobal(reporter)
     val compilation  = new global.Run()
     val codeUnit = global.newCompilationUnit(code)
     compilation.compileUnits(List(codeUnit), compilation.parserPhase)
-    global.afterEachPhase {
-      codeAtEachPhase += global.phase.name -> currentCompiled(compilation)
-    }
-    //a way to check code after a phase is to used compiltation.units
-    try {
-      reporter.report().appendCode(codeAtEachPhase)
-    } finally {
-      reporter.clearOutputCount()
-    }
+    reporter.report()
+  }
+
+  def transform(code : String) : (String, CompilationReport) = {
+    val reporter = new DebuggerReporter(settings)
+    val global = createGlobal(reporter)
+    val transform = new global.Run()
+    val codeUnit = global.newCompilationUnit(code)
+    transform.compileLate(codeUnit)
+    (currentCompiled(transform), reporter.report())
   }
 }
 case class CompilationReport(errors : List[String],
                              warnings: List[String],
-                             info : List[String],
-                             code : Map[String, String] = Map()) {
+                             info : List[String]) {
   def hasErrors : Boolean = errors.nonEmpty
 
   def hasWarnings : Boolean = warnings.nonEmpty
 
   def hasInfo : Boolean = info.nonEmpty
-
-  def appendCode(compiledCode : Map[String, String]) : CompilationReport = this.copy(code = compiledCode)
 }
 
 class DebuggerReporter(override val settings: Settings) extends AbstractReporter {

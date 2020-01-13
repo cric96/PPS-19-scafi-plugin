@@ -6,7 +6,6 @@ import scala.tools.nsc.transform.Transform
 class TransformComponent(val c : ComponentContext) extends AbstractComponent(c, TransformComponent)
   with Transform
   with TreeDSL {
-  private val aggregateName = global.newTermName("aggregate")
   import global._ //needed to avoid global.type for each compiler type
 
   override protected def newTransformer(unit: CompilationUnit): Transformer = {
@@ -34,13 +33,12 @@ class TransformComponent(val c : ComponentContext) extends AbstractComponent(c, 
     }
   }
 }
-
 object TransformComponent extends ComponentDescriptor  {
-  def apply()(implicit c : ComponentContext) : TransformComponent = new TransformComponent(c)
+  override def name: String = "scafi-transform"
 
   override val runsAfter: List[String] = List("parser")
 
   override val runsBefore: List[String] = List("namer")
 
-  override def name: String = "scafi-transform"
+  def apply()(implicit c : ComponentContext) : TransformComponent = new TransformComponent(c)
 }
