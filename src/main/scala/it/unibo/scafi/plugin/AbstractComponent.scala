@@ -17,10 +17,9 @@ abstract class AbstractComponent(protected val context : ComponentContext, prote
   override val runsAfter: List[String] = descriptor.runsAfter
 
   override val runsBefore: List[String] = descriptor.runsBefore
-  protected def hasSameName(symbol : Symbol, name : String) : Boolean = {
-    //TODO! it is the right way to check name ??
-    symbol.nameString == name
-  }
+  //TODO! it is the right way to check name ??
+  protected def hasSameName(symbol : Symbol, name : String) : Boolean = symbol.nameString == name
+
   /**
     * return the symbol from tree if certain condition are satisfied.
     * @param tree : object where check the condition passed
@@ -36,11 +35,21 @@ abstract class AbstractComponent(protected val context : ComponentContext, prote
       case _ => false
     })
 
-    symbol.map(_.baseClasses)
-      .map(classNames => classNames.filter(hasSameName(_, typeName)))
-      .nonEmpty
+    symbol.map(_.selfType.baseClasses)
+      .map(classNames => classNames.exists(hasSameName(_, typeName)))
+      .exists(p => p)
   }
 
+  protected def search(root : Tree)(extractor : Tree => Option[Tree]) : List[Tree] = extractor(root) match {
+    case None => root.children.flatMap(search(_)(extractor))
+    case Some(tree) => List(tree)
+  }
+
+  protected def searchWithCondition(root : Tree)(condition : Tree => Boolean) : List[Tree] = if(condition(root)) {
+    List(root)
+  } else {
+    root.children.flatMap(searchWithCondition(_)(condition))
+  }
   def extractAggregateMain(tree : Tree) : Option[DefDef] = {
     tree match {
       case defMain : DefDef if defMain.name.endsWith("main") =>
@@ -67,4 +76,11 @@ abstract class AbstractComponent(protected val context : ComponentContext, prote
 case class ComponentContext(global : Global,
                             aggregateProgram : String,
                             constructs : String,
-                            aggregateFunctions : Map[String, AggregateFunction])
+                            var aggregateFunctions : Map[String, AggregateFunction]) {
+  def functionFromName(name : String) : Option[AggregateFunction] = aggregateFunctions.get(name)
+
+  def functionFromSymbol(sym : Global#Symbol) = sym match {
+    case null => None
+    case _ => aggregateFunctions.get(sym.nameString)
+  }
+}

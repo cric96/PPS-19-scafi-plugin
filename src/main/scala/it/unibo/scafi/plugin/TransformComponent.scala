@@ -14,11 +14,10 @@ class TransformComponent(val c : ComponentContext) extends AbstractComponent(c, 
   }
 
   private object AggregateProgramTransformer extends Transformer {
-    private val aggregateProgramTransform = WrapFunction
     override def transform(tree: global.Tree): global.Tree = {
       extractAggregateMain(tree) match {
         case None => super.transform(tree)
-        case Some(_) => aggregateProgramTransform.transform(tree)
+        case Some(_) => WrapFunction.transform(tree)
       }
     }
   }

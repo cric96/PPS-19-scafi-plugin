@@ -1,6 +1,6 @@
 package it.unibo.scafi.plugin
 
-import it.unibo.scafi.definition.{AggregateFunction, AggregateType, F, L}
+import it.unibo.scafi.definition.{AggregateFunction, AggregateType, ArrowType, F, L}
 
 import scala.tools.nsc.Phase
 
@@ -21,20 +21,8 @@ class TypeCheckComponent(context : ComponentContext) extends AbstractComponent(c
     */
   class TypeCheckPhase(prev: Phase) extends StdPhase(prev) {
     private def extractAggregateProgram(tree : Tree) : Option[Tree] = Some(tree).filter(extendsFromType(_, context.aggregateProgram))
-    /**
-      * search all aggregate programs from a tree
-      * @param tree: the structure where extract aggregate programs
-      * @return list of aggregate programs if are defined, List.empty otherwise
-      */
-    private def searchAggregatePrograms(tree : Tree) : List[Tree] = extractAggregateProgram(tree) match {
-      case None => tree.children.flatMap(searchAggregatePrograms)
-      case Some(tree) => List(tree)
-    }
 
-    private def extractAggregateFunction(tree : Tree) : Option[AggregateFunction] = tree.symbol match {
-      case null => None
-      case _ => context.aggregateFunctions.get(tree.symbol.nameString)
-    }
+    private def extractAggregateFunction(tree : Tree) : Option[AggregateFunction] =  context.functionFromSymbol(tree.symbol)
     //here the magic happens, verify the correctness of the programs
     override def apply(unit: CompilationUnit): Unit = {
       global.inform(phaseName)
@@ -47,7 +35,7 @@ class TypeCheckComponent(context : ComponentContext) extends AbstractComponent(c
       }
 
       //extract all aggregate main, and check the properties
-      searchAggregatePrograms(unit.body).map(searchMainBody).collect {
+      search(unit.body)(extractAggregateProgram).map(searchMainBody).collect {
         case Some(mainTree) => mainTree
       } foreach {
         evalAggregateMain  //here starts program evaluation
@@ -85,6 +73,7 @@ class TypeCheckComponent(context : ComponentContext) extends AbstractComponent(c
       aggType match {
         case F if !isFieldPresent(argTree) => globalError(aggregateTypeError(fun, F, L))
         case L if isFieldPresent(argTree) => globalError(aggregateTypeError(fun, L, F))
+        case ArrowType(returns, args) => //TODO how to manage arrow type arguments?
         case _ =>
       }
       argTree.children.foreach(aggregateFunctionCorrectness)

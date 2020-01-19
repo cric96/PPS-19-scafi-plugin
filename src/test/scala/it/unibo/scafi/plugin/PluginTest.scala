@@ -7,17 +7,32 @@ class PluginTest(verbose : Boolean = false) extends FlatSpec with BeforeAndAfter
   override def beforeEach(): Unit = {
     compiler = new ScafiCompilerPlatform(verbose)
   }
-  /*NB! it is the correct way? it is better to depends on scafi-core? it is a good idea using annotations?*/
   protected val commonCode =
     """
+     |trait Constructs {
+     |  def nbr[A](expr: => A): A
+     |  def foldhood[A](init: => A)(aggr: (A, A) => A)(expr: => A): A
+     |  def rep[A](init: =>A)(fun: (A) => A): A
+     |  def aggregate[A](f: => A) : A
+     |}
+     |trait Lib {
+     |  this: Constructs =>
+     |
+     |  def minHood[A](init: => A)(expr: => A): A = foldhood(init)((a,b) => a)(expr)
+     |  def maxHood[A](init: => A, expr: => A): A = {
+     |    val x = 10 //nothing special
+     |    foldhood(init)((a,b) => a)(expr)
+     |  }
+     |  def nbrRange() : Double = nbr(10.0)
+     |}
      |trait ProgramSchema {
      |  def main() : Unit
      |}
-     |trait AggregateProgram extends ProgramSchema {
-     |  def nbr[A](expr: => A): A = expr
-     |  def foldhood[A](init: => A)(aggr: (A, A) => A)(expr: => A): A = expr
-     |  def rep[A](init: =>A)(fun: (A) => A): A = init
-     |  def aggregate[A](f: => A) : A = f
+     |trait AggregateProgram extends ProgramSchema with Constructs{
+     |  override def nbr[A](expr: => A): A = expr
+     |  override def foldhood[A](init: => A)(aggr: (A, A) => A)(expr: => A): A = expr
+     |  override def rep[A](init: =>A)(fun: (A) => A): A = init
+     |  override def aggregate[A](f: => A) : A = f
      |}
     """.stripMargin
 
