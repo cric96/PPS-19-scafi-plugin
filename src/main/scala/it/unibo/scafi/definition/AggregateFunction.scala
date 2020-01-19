@@ -5,7 +5,7 @@ sealed trait AggregateType
 case object L extends AggregateType
 case object F extends AggregateType
 case object T extends AggregateType
-case class ArrowType(returns : AggregateType, args : Seq[AggregateType]) extends AggregateType
+case class ArrowType(args : Seq[AggregateType], returns : AggregateType) extends AggregateType
 //TODO explain better
 
 /**
@@ -35,9 +35,9 @@ object AggregateFunction {
   private def productToSeq(p : Product) : Seq[AggregateType] = p.productIterator.toList.map {
     case value : AggregateType => value
   }
-  implicit def tuple1ToArrowType(tpe : (AggregateType, AggregateType)) : ArrowType = ArrowType(tpe._2, List(tpe._1))
-  implicit def tuple2ToArrowType(tpe : ((AggregateType, AggregateType), AggregateType)) : ArrowType = ArrowType(tpe._2, productToSeq(tpe._1))
-  implicit def tuple3ToArrowType(tpe : ((AggregateType, AggregateType, AggregateType), AggregateType)) : ArrowType = ArrowType(tpe._2, productToSeq(tpe._1))
-  implicit def tuple4ToArrowType(tpe : ((AggregateType, AggregateType, AggregateType, AggregateType), AggregateType)) : ArrowType = ArrowType(tpe._2, productToSeq(tpe._1))
-  implicit def tupleSeqToArrowType(tpe : (Seq[AggregateType], AggregateType)) : ArrowType = ArrowType(tpe._2, tpe._1)
+  implicit def tuple1ToArrowType(tpe : (AggregateType, AggregateType)) : ArrowType = ArrowType(List(tpe._1), tpe._2)
+  implicit def tuple2ToArrowType(tpe : ((AggregateType, AggregateType), AggregateType)) : ArrowType = ArrowType(productToSeq(tpe._1),tpe._2)
+  implicit def tuple3ToArrowType(tpe : ((AggregateType, AggregateType, AggregateType), AggregateType)) : ArrowType = ArrowType(productToSeq(tpe._1), tpe._2)
+  implicit def tuple4ToArrowType(tpe : ((AggregateType, AggregateType, AggregateType, AggregateType), AggregateType)) : ArrowType = ArrowType(productToSeq(tpe._1), tpe._2)
+  implicit def tupleSeqToArrowType(tpe : (Seq[AggregateType], AggregateType)) : ArrowType = ArrowType(tpe._1, tpe._2)
 }

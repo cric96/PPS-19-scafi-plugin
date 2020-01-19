@@ -17,12 +17,6 @@ class PluginTest(verbose : Boolean = false) extends FlatSpec with BeforeAndAfter
      |}
      |trait Lib {
      |  this: Constructs =>
-     |
-     |  def minHood[A](init: => A)(expr: => A): A = foldhood(init)((a,b) => a)(expr)
-     |  def maxHood[A](init: => A, expr: => A): A = {
-     |    val x = 10 //nothing special
-     |    foldhood(init)((a,b) => a)(expr)
-     |  }
      |  def nbrRange() : Double = nbr(10.0)
      |}
      |trait ProgramSchema {

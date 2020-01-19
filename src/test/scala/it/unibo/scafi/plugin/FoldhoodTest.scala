@@ -7,13 +7,15 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class FoldhoodTest extends PluginTest {
-  val foldhoodSig = aggFun("foldhood", L, args(block(L), block(T), block(F)))
+  import AggregateFunction._
+  val foldhoodSig = aggFun("foldhood", L, args(block(L), block((T,T) -> T), block(F)))
   "Scafi plugin" should "raise an error if foldhood call isn't correct" in {
     val localWrongReport = compiler.compile(writeInMain {
       """
         | foldhood{nbr{10}}{(x,y) => x}{nbr(10)}
       """.stripMargin
     })
+    println(localWrongReport.errors)
     localWrongReport.hasErrors shouldBe true
     localWrongReport.errors.contains(aggregateTypeError(foldhoodSig, L, F)) shouldBe true
 

@@ -1,10 +1,12 @@
 package it.unibo.scafi.plugin
-import it.unibo.scafi.definition.{AggregateFunction, AggregateType, T}
+import it.unibo.scafi.definition.{AggregateFunction, AggregateType, F, L, T}
 import AggregateFunction._
+
 import scala.tools.nsc.Phase
 
 class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, DiscoverComponent){
   import global._
+  import DiscoverComponent._
   var functionsDef : List[DefDef] = List()
 
   override def newPhase(prev: Phase): Phase = new DiscoverPhase(prev)
@@ -38,9 +40,7 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
     override def run(): Unit = {
       echoPhaseSummary(this)
       currentRun.units foreach applyPhase
-      println(functionsDef.map(_.name))
       markAggregateConstructors()
-      println(context.aggregateFunctions)
     }
 
     private def markAggregateConstructors(): Unit = {
@@ -50,12 +50,11 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
 
     private def resolveType(defDef: (String, DefDef), functionDefMap: Map[String, DefDef]): Unit = {
       val (name, funDef) = defDef
-
-      def isAlreadyMarked(tree : Tree) : Boolean = context.functionFromSymbol(tree.symbol).isDefined
       def expressions(tree : Tree) : List[Tree] = tree match {
         case Block(_, _) => tree.children
         case _ => List(tree)
       }
+
       def resolveReturnType(tree : Tree) : AggregateType = {
         val lastExp = expressions(tree).last
         context.functionFromSymbol(lastExp.symbol) match {
@@ -63,29 +62,47 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
           case Some(fun) => fun.returns
         }
       }
-      def resolveArg(arg : Tree) : AggregateType = {
-        var argType : AggregateType = T
-        val exprs = expressions(funDef.rhs)
-        exprs foreach {
-          case ap: Apply if isAlreadyMarked(ap) => T //TODO
-          case ap: Apply if functionDefMap.contains(ap.symbol.nameString) => T //TODO
-          case expr => T
-        }
-        argType
+      def incompatibleType(types : Seq[AggregateType]) = types.contains(L) && types.contains(F)
+
+      def typeFromCompatibleTypes(types : Seq[AggregateType]) : AggregateType = types match {
+        case _ if types.contains(L) => L
+        case _ if types.contains(F) => F
+        case _ if types.nonEmpty => types.head
+        case _ => T
       }
-      val args = funDef.vparamss.map(params => block(params.map(resolveArg):_*))
+      def extractArgTypeFrom(apply : Apply, aggFun : AggregateFunction, argDef : Tree) : Seq[AggregateType] = {
+        aggFun.args.zipWithIndex.collect {
+          case (argBlock, index) => val currentBlock = uncurry(apply, index)
+            currentBlock.args.zipWithIndex.collect {
+              case (applyArg, index) if (applyArg.symbol == argDef.symbol) => argBlock(index)
+            }
+        }.flatten
+      }
+      def resolveArg(argDef : Tree) : AggregateType = {
+        val bodyExpr = expressions(funDef.rhs)
+        val typesFromBody = bodyExpr.collect {
+          case apply : Apply => context.functionFromSymbol(apply.symbol) match {
+            case Some(aggFun) => extractArgTypeFrom(apply, aggFun, argDef)
+            case None => functionDefMap.get(apply.symbol.nameString) match {
+              case Some(defDef) =>
+                resolveType(apply.symbol.nameString -> defDef, functionDefMap)
+                extractArgTypeFrom(apply, context.functionFromSymbol(apply.symbol).get, argDef)
+              case _ => List.empty
+            }
+          }
+        }.flatten
+        if(incompatibleType(typesFromBody)) {
+          global.error("incompatible aggregate type: pay attention in use of local and field types..")
+        }
+        typeFromCompatibleTypes(typesFromBody)
+      }
       ///first expand each tree.
+      val args = funDef.vparamss.map(params => block(params.map(resolveArg):_*))
       ///return type eval
       val returnType = resolveReturnType(funDef.rhs)
-      c.aggregateFunctions += name -> AggregateFunction(name, returnType, args)
-    }
-
-    private def extractReturnType(tree: Tree): AggregateType = tree.symbol match {
-      case null => T
-      case symbol => context.functionFromSymbol(symbol) match {
-        case None => T
-        case Some(fun) => fun.returns
-      }
+      val aggFunDef = AggregateFunction(name, returnType, args)
+      global.inform(resolveAggDefinition(aggFunDef))
+      c.aggregateFunctions += name -> aggFunDef
     }
   }
 }
@@ -95,6 +112,8 @@ object DiscoverComponent extends ComponentDescriptor  {
   override val runsBefore: List[String] = List(TypeCheckComponent.name)
 
   override val runsAfter: List[String] = List("refchecks")
+
+  def resolveAggDefinition(aggFun : AggregateFunction) : String = "resolved:" + aggFun
 
   def apply()(implicit c : ComponentContext) : DiscoverComponent = new DiscoverComponent(c)
 }
