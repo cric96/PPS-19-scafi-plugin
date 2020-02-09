@@ -11,15 +11,35 @@ import scala.tools.nsc.plugins.PluginComponent
 abstract class AbstractComponent(protected val context : ComponentContext, protected val descriptor: ComponentDescriptor) extends PluginComponent {
   override val global: Global = context.global
   import global._
+  private var componentEnabled = true
 
   override val phaseName: String = descriptor.name
 
   override val runsAfter: List[String] = descriptor.runsAfter
 
   override val runsBefore: List[String] = descriptor.runsBefore
-  //TODO! it is the right way to check name ??
-  protected def hasSameName(symbol : Symbol, name : String) : Boolean = symbol.nameString == name
 
+  def disable() : Unit = componentEnabled = false
+
+  private var errorsEnabled = true
+  def error(reason : String, pos : Position) : Unit = if(errorsEnabled) {
+    globalError(pos, reason)
+  } else {
+    warning(pos, reason)
+  }
+  def error(reason : String) : Unit = if(errorsEnabled) {
+    globalError(reason)
+  } else {
+    warning(reason)
+  }
+
+  override def enabled: Boolean = componentEnabled
+  //by default, component doesn't make anything.
+  def processOption(optionName : String, value : String) : Unit = (optionName, value) match {
+    case ("error", "disable") => this.errorsEnabled = false
+    case _ =>
+  }
+  protected def hasSameName(symbol : Symbol, name : String) : Boolean = symbol.nameString == name
   /**
     * return the symbol from tree if certain condition are satisfied.
     * @param tree : object where check the condition passed
@@ -50,6 +70,7 @@ abstract class AbstractComponent(protected val context : ComponentContext, prote
   } else {
     root.children.flatMap(searchWithCondition(_)(condition))
   }
+
   def extractAggregateMain(tree : Tree) : Option[DefDef] = {
     tree match {
       case defMain : DefDef if defMain.name.endsWith("main") =>
@@ -76,11 +97,12 @@ abstract class AbstractComponent(protected val context : ComponentContext, prote
 case class ComponentContext(global : Global,
                             aggregateProgram : String,
                             constructs : String,
-                            var aggregateFunctions : Map[String, AggregateFunction]) {
+                            var aggregateFunctions : Map[String, AggregateFunction]
+                           ) {
   def functionFromName(name : String) : Option[AggregateFunction] = aggregateFunctions.get(name)
 
-  def functionFromSymbol(sym : Global#Symbol) = sym match {
+  def functionFromTree(tree : Global#Tree) = tree.symbol match {
     case null => None
-    case _ => aggregateFunctions.get(sym.nameString)
+    case sym => aggregateFunctions.get(sym.nameString)
   }
 }

@@ -57,7 +57,7 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
 
       def resolveReturnType(tree : Tree) : AggregateType = {
         val lastExp = expressions(tree).last
-        context.functionFromSymbol(lastExp.symbol) match {
+        context.functionFromTree(lastExp) match {
           case None => T
           case Some(fun) => fun.returns
         }
@@ -81,18 +81,18 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
       def resolveArg(argDef : Tree) : AggregateType = {
         val bodyExpr = expressions(funDef.rhs)
         val typesFromBody = bodyExpr.collect {
-          case apply : Apply => context.functionFromSymbol(apply.symbol) match {
+          case apply : Apply => context.functionFromTree(apply) match {
             case Some(aggFun) => extractArgTypeFrom(apply, aggFun, argDef)
             case None => functionDefMap.get(apply.symbol.nameString) match {
               case Some(defDef) =>
                 resolveType(apply.symbol.nameString -> defDef, functionDefMap)
-                extractArgTypeFrom(apply, context.functionFromSymbol(apply.symbol).get, argDef)
+                extractArgTypeFrom(apply, context.functionFromTree(apply).get, argDef)
               case _ => List.empty
             }
           }
         }.flatten
         if(incompatibleType(typesFromBody)) {
-          global.error("incompatible aggregate type: pay attention in use of local and field types..")
+          error("incompatible aggregate type: pay attention in use of local and field types..")
         }
         typeFromCompatibleTypes(typesFromBody)
       }

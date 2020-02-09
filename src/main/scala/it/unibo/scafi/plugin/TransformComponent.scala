@@ -31,6 +31,11 @@ class TransformComponent(val c : ComponentContext) extends AbstractComponent(c, 
       }
     }
   }
+
+  override def processOption(name : String, value : String): Unit = (name, value) match {
+    case ("wrap", "disable") => this.disable()
+    case _ => super.processOption(name, value) //TODO really important, is a good way? it is better a template method?
+  }
 }
 object TransformComponent extends ComponentDescriptor  {
   override def name: String = "scafi-transform"

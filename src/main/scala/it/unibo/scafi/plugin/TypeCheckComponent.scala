@@ -22,7 +22,7 @@ class TypeCheckComponent(context : ComponentContext) extends AbstractComponent(c
   class TypeCheckPhase(prev: Phase) extends StdPhase(prev) {
     private def extractAggregateProgram(tree : Tree) : Option[Tree] = Some(tree).filter(extendsFromType(_, context.aggregateProgram))
 
-    private def extractAggregateFunction(tree : Tree) : Option[AggregateFunction] =  context.functionFromSymbol(tree.symbol)
+    private def extractAggregateFunction(tree : Tree) : Option[AggregateFunction] =  context.functionFromTree(tree)
     //here the magic happens, verify the correctness of the programs
     override def apply(unit: CompilationUnit): Unit = {
       global.inform(phaseName)
@@ -71,8 +71,8 @@ class TypeCheckComponent(context : ComponentContext) extends AbstractComponent(c
     //TODO Think how you can add index in error.
     private def checkArgsCorrectness(fun : AggregateFunction, aggType : AggregateType, argTree : Tree) = {
       aggType match {
-        case F if !isFieldPresent(argTree) => globalError(aggregateTypeError(fun, F, L))
-        case L if isFieldPresent(argTree) => globalError(aggregateTypeError(fun, L, F))
+        case F if !isFieldPresent(argTree) => error(aggregateTypeError(fun, F, L))
+        case L if isFieldPresent(argTree) => error(aggregateTypeError(fun, L, F))
         case ArrowType(returns, args) => //TODO how to manage arrow type arguments?
         case _ =>
       }

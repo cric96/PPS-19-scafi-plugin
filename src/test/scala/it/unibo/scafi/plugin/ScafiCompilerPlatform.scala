@@ -5,22 +5,18 @@ import scala.tools.nsc.io.VirtualDirectory
 import scala.tools.nsc.reporters.AbstractReporter
 import scala.tools.nsc.{Global, Settings}
 
-class ScafiCompilerPlatform(verbose : Boolean) {
+class ScafiCompilerPlatform(verbose : Boolean, pluginOptions : String *) {
   private val settings = new Settings() //setting used to create the context of compiler
   settings.embeddedDefaults(this.getClass.getClassLoader)
   settings.verbose.value = verbose
+  pluginOptions.foreach(setting => settings.pluginOptions.appendToValue(s"scafi:$setting"))
   private val virtualDir = new VirtualDirectory("(memory)", None)
   settings.outputDirs.setSingleOutput(virtualDir) //all compile source are store in memory
   settings.usejavacp.value = true //used to find the scala compiler by the global
   //create global, attach the new plugin phases, using a report to check error and warning
   private def createGlobal(report : AbstractReporter) : Global = {
     new Global(settings,report) {
-      override protected def computeInternalPhases () {
-        super.computeInternalPhases
-        //add the phase added on this module
-        for (phase <- new ScafiDSLPlugin(this).components)
-          phasesSet += phase
-      }
+      override protected def loadRoughPluginsList() = new ScafiDSLPlugin(this) :: super.loadRoughPluginsList()
     }
   }
   private def currentCompiled(run : Global#Run) : String = {
