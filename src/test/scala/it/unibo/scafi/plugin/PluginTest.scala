@@ -9,35 +9,38 @@ class PluginTest(verbose : Boolean = false) extends FlatSpec with BeforeAndAfter
   }
   protected val commonCode =
     """
-     |trait Constructs {
-     |  def nbr[A](expr: => A): A
-     |  def foldhood[A](init: => A)(aggr: (A, A) => A)(expr: => A): A
-     |  def rep[A](init: =>A)(fun: (A) => A): A
-     |  def aggregate[A](f: => A) : A
+     |package it.unibo.scafi.core
+     |trait Language {
+     |  trait Constructs {
+     |    def nbr[A](expr: => A): A = expr
+     |    def foldhood[A](init: => A)(aggr: (A, A) => A)(expr: => A): A = expr
+     |    def rep[A](init: =>A)(fun: (A) => A): A = init
+     |    def aggregate[A](f: => A) : A = f
+     |  }
      |}
-     |trait Lib {
-     |  this: Constructs =>
-     |  def nbrRange() : Double = nbr(10.0)
+     |trait RichLanguage extends Language {
+     |  trait Lib {
+     |    this: Constructs =>
+     |      def nbrRange() : Double = nbr(10.0)
+     |  }
      |}
-     |trait ProgramSchema {
-     |  def main() : Unit
+     |trait Semantics extends RichLanguage {
+     |  trait ProgramSchema extends Constructs with Lib {
+     |    def main() : Unit
+     |  }
      |}
-     |trait AggregateProgram extends ProgramSchema with Constructs{
-     |  override def nbr[A](expr: => A): A = expr
-     |  override def foldhood[A](init: => A)(aggr: (A, A) => A)(expr: => A): A = expr
-     |  override def rep[A](init: =>A)(fun: (A) => A): A = init
-     |  override def aggregate[A](f: => A) : A = f
-     |}
+     |object core extends Semantics
     """.stripMargin
 
   protected def writeInMain(mainBody : String): String = {
     s"""
       $commonCode
-       class Main extends AggregateProgram {
-          override def main() : Unit = {
-            $mainBody
-          }
+      import core._
+      class Main extends ProgramSchema {
+        override def main() : Unit = {
+          $mainBody
         }
+      }
     """.stripMargin
   }
 }

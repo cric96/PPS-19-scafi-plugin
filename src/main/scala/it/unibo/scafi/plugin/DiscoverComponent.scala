@@ -7,7 +7,8 @@ import scala.tools.nsc.Phase
 class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, DiscoverComponent){
   import global._
   import DiscoverComponent._
-  var functionsDef : List[DefDef] = List()
+  var functionsDef : List[DefDef] = List.empty
+  var resolvingSet : Set[String] = Set.empty
 
   override def newPhase(prev: Phase): Phase = new DiscoverPhase(prev)
 
@@ -26,11 +27,12 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
     private def findAllConstructs(tree: Tree): Seq[DefDef] = {
       def nameAllowed(name : String) : Boolean = {
         name match {
-          case "$init$" | "<init>" | "main" => false
+          case _  if name.contains("init") => false
+          case _  if name.contains("main") => false
           case _ => ! context.aggregateFunctions.contains(name)
         }
       }
-      def functionAllowed(funDef : DefDef) : Boolean = !funDef.rhs.isEmpty && nameAllowed(funDef.name.toString)
+      def functionAllowed(funDef : DefDef) : Boolean = !funDef.rhs.isEmpty && nameAllowed(funDef.symbol.fullName)
       tree match {
         case defDef: DefDef if functionAllowed(defDef) =>  defDef :: tree.children.flatMap(findAllConstructs)
         case _ => tree.children.flatMap(findAllConstructs)
@@ -44,12 +46,20 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
     }
 
     private def markAggregateConstructors(): Unit = {
-      val functionsDefMap = functionsDef.map(funDef => funDef.symbol.nameString -> funDef).toMap
+      val functionsDefMap = functionsDef.map(funDef => funDef.symbol.fullName -> funDef).toMap
       functionsDefMap.foreach(resolveType(_, functionsDefMap))
     }
 
-    private def resolveType(defDef: (String, DefDef), functionDefMap: Map[String, DefDef]): Unit = {
+    private def resolveType(defDef: (String, DefDef), functionDefMap: Map[String, DefDef]): Boolean = {
       val (name, funDef) = defDef
+      global.inform("resolving:" + name)
+
+      if(resolvingSet.contains(name)) {
+        return false
+      }
+
+      resolvingSet += name
+
       def expressions(tree : Tree) : List[Tree] = tree match {
         case Block(_, _) => tree.children
         case _ => List(tree)
@@ -62,6 +72,7 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
           case Some(fun) => fun.returns
         }
       }
+
       def incompatibleType(types : Seq[AggregateType]) = types.contains(L) && types.contains(F)
 
       def typeFromCompatibleTypes(types : Seq[AggregateType]) : AggregateType = types match {
@@ -70,11 +81,20 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
         case _ if types.nonEmpty => types.head
         case _ => T
       }
+      //TODO CLARIFY THIS METHOD
       def extractArgTypeFrom(apply : Apply, aggFun : AggregateFunction, argDef : Tree) : Seq[AggregateType] = {
         aggFun.args.zipWithIndex.collect {
           case (argBlock, index) => val currentBlock = uncurry(apply, index)
             currentBlock.args.zipWithIndex.collect {
-              case (applyArg, index) if (applyArg.symbol == argDef.symbol) => argBlock(index)
+              case (applyArg, index) if (applyArg.symbol == argDef.symbol) =>
+                try {
+                  argBlock(index)
+                } catch {
+                  case exc : IndexOutOfBoundsException =>
+
+                    println(index, aggFun, apply.symbol.fullName, "BLOCK = " + argBlock, "block" + currentBlock.args)
+                    null
+                }
             }
         }.flatten
       }
@@ -83,10 +103,14 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
         val typesFromBody = bodyExpr.collect {
           case apply : Apply => context.functionFromTree(apply) match {
             case Some(aggFun) => extractArgTypeFrom(apply, aggFun, argDef)
-            case None => functionDefMap.get(apply.symbol.nameString) match {
+            case None => functionDefMap.get(apply.symbol.fullName) match {
               case Some(defDef) =>
-                resolveType(apply.symbol.nameString -> defDef, functionDefMap)
-                extractArgTypeFrom(apply, context.functionFromTree(apply).get, argDef)
+                val resolved = resolveType(apply.symbol.fullName -> defDef, functionDefMap)
+                if(resolved) {
+                  extractArgTypeFrom(apply, context.functionFromTree(apply).get, argDef)
+                } else {
+                  List.empty
+                }
               case _ => List.empty
             }
           }
@@ -96,13 +120,17 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
         }
         typeFromCompatibleTypes(typesFromBody)
       }
-      ///first expand each tree.
-      val args = funDef.vparamss.map(params => block(params.map(resolveArg):_*))
+      val args = funDef.vparamss
+        .map(params => block(params.filter(! _.symbol.isImplicit).map(resolveArg):_*))
+        .filter(_.nonEmpty)
+
       ///return type eval
       val returnType = resolveReturnType(funDef.rhs)
       val aggFunDef = AggregateFunction(name, returnType, args)
-      global.inform(resolveAggDefinition(aggFunDef))
+      global.inform(funDef.pos, resolveAggDefinition(aggFunDef))
       c.aggregateFunctions += name -> aggFunDef
+      resolvingSet -= name
+      true
     }
   }
 }

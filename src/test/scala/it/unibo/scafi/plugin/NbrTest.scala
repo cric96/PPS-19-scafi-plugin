@@ -8,7 +8,7 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class NbrTest extends PluginTest(false) {
   import TypeCheckComponent._
-  val nbrSig = aggFun("nbr", F, args(block(L)))
+  val nbrSig = aggFun("it.unibo.scafi.core.Language.Constructs.nbr", F, args(block(L)))
 
   "Scafi plugin" should "raise an error if there are nested nbr" in {
     val nestedNbr = compiler.compile(

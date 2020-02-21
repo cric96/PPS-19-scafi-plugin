@@ -19,14 +19,15 @@ class ScafiDSLPlugin(val global: Global) extends Plugin {
   implicit val g: Global = global
   //the term used to check and find the properties of aggregate program
   import AggregateFunction._
+  private val baseClass = "it.unibo.scafi.core.Language.Constructs"
   private val coreFunction = AggregateFunction.toMap(
-    aggFun("nbr", returns = F, args(block(L))),
-    aggFun("foldhood", returns = L, args(block(L), block((T,T) -> T), block(F))),
-    aggFun("rep", returns = L, args(block(L), block(T)))
+    aggFun(s"$baseClass.nbr", returns = F, args(block(L))),
+    aggFun(s"$baseClass.foldhood", returns = L, args(block(L), block((T,T) -> T), block(F))),
+    aggFun(s"$baseClass.rep", returns = L, args(block(L), block(T)))
   )
-
+  private val baseAggregateProgram = "it.unibo.scafi.core.Semantics.ProgramSchema"
   //the context used in all plugin components.
-  implicit val componentContext : ComponentContext = ComponentContext(g, "ProgramSchema", "Constructs", coreFunction)
+  implicit val componentContext : ComponentContext = ComponentContext(g, baseAggregateProgram, baseClass, coreFunction)
   override val name: String = "scafi"
   override val components: List[AbstractComponent] = List(
     TransformComponent(),
@@ -42,7 +43,6 @@ class ScafiDSLPlugin(val global: Global) extends Plugin {
         throw new IllegalArgumentException("Invalid option")
       }
       components.foreach(_.processOption(splitted(0), splitted(1)))
-      /*TODO, think if is a good idea to add some params, and understood how*/
     }
   }
 

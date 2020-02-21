@@ -8,7 +8,7 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class FoldhoodTest extends PluginTest {
   import AggregateFunction._
-  val foldhoodSig = aggFun("foldhood", L, args(block(L), block((T,T) -> T), block(F)))
+  val foldhoodSig = aggFun("it.unibo.scafi.core.Language.Constructs.foldhood", L, args(block(L), block((T,T) -> T), block(F)))
   "Scafi plugin" should "raise an error if foldhood call isn't correct" in {
     val localWrongReport = compiler.compile(writeInMain {
       """

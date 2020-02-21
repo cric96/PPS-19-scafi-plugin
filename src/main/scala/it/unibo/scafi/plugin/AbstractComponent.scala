@@ -39,7 +39,7 @@ abstract class AbstractComponent(protected val context : ComponentContext, prote
     case ("error", "disable") => this.errorsEnabled = false
     case _ =>
   }
-  protected def hasSameName(symbol : Symbol, name : String) : Boolean = symbol.nameString == name
+  protected def hasSameName(symbol : Symbol, name : String) : Boolean = symbol.fullName == name
   /**
     * return the symbol from tree if certain condition are satisfied.
     * @param tree : object where check the condition passed
@@ -81,7 +81,7 @@ abstract class AbstractComponent(protected val context : ComponentContext, prote
       case _ => None
     }
   }
-
+  //TODO rethink a better solution for uncurry function definition
   protected def uncurry(apply : Apply, uncurryTimes : Int): Apply = (uncurryTimes,apply) match {
     case (0,_) => apply
     case (n, Apply(fun : Apply, _)) => uncurry(fun, n - 1)
@@ -103,6 +103,6 @@ case class ComponentContext(global : Global,
 
   def functionFromTree(tree : Global#Tree) = tree.symbol match {
     case null => None
-    case sym => aggregateFunctions.get(sym.nameString)
+    case sym => aggregateFunctions.get(sym.fullName)
   }
 }

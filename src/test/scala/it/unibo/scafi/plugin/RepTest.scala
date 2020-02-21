@@ -8,7 +8,7 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class RepTest extends PluginTest {
   import TypeCheckComponent._
-  val repSig = aggFun("rep", returns = L, args(block(L), block(T)))
+  val repSig = aggFun("it.unibo.scafi.core.Language.Constructs.rep", returns = L, args(block(L), block(T)))
 
   "Scafi plugin" should "raise an error if there is field value in rep" in {
     val report = compiler.compile(writeInMain {

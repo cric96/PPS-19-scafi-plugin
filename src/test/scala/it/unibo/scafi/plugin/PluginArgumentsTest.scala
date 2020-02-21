@@ -8,7 +8,7 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class PluginArgumentsTest extends PluginTest {
-  val repSig = aggFun("rep", returns = L, args(block(L), block(T)))
+  val repSig = aggFun("it.unibo.scafi.core.Language.Constructs.rep", returns = L, args(block(L), block(T)))
   val compilerNoWraps = new ScafiCompilerPlatform(false, "wrap=disable")
   val compilerNoError = new ScafiCompilerPlatform(false, "error=disable")
   //Same test of AggregateWrapsTest, but with wrap=disable option.
