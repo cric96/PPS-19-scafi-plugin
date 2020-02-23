@@ -18,7 +18,6 @@ class RepTest extends PluginTest {
     })
     report.hasErrors shouldBe true
     report.errors.contains(aggregateTypeError(repSig, L, F)) shouldBe true
-    println(report.info)
   }
 
   "Scafi plugin" should "work as usual with rep" in {

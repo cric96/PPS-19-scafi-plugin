@@ -15,7 +15,6 @@ class FoldhoodTest extends PluginTest {
         | foldhood{nbr{10}}{(x,y) => x}{nbr(10)}
       """.stripMargin
     })
-    println(localWrongReport.errors)
     localWrongReport.hasErrors shouldBe true
     localWrongReport.errors.contains(aggregateTypeError(foldhoodSig, L, F)) shouldBe true
 

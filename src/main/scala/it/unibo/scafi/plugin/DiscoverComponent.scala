@@ -3,7 +3,15 @@ import it.unibo.scafi.definition.{AggregateFunction, AggregateType, F, L, T}
 import AggregateFunction._
 
 import scala.tools.nsc.Phase
-
+/*
+  tips for solving overloading methods:
+    matching with tree need another parameter, the position where the symbol is defined. with this, the
+    function are unique.
+ */
+/**
+  *
+  * @param c
+  */
 class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, DiscoverComponent){
   import global._
   import DiscoverComponent._
@@ -13,6 +21,12 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
   override def newPhase(prev: Phase): Phase = new DiscoverPhase(prev)
 
   class DiscoverPhase(prev : Phase) extends StdPhase(prev) {
+    override def run(): Unit = {
+      echoPhaseSummary(this)
+      currentRun.units foreach applyPhase
+      markAggregateConstructors()
+    }
+
     private def extractConstructsDefinition(tree: Tree): Option[Tree] = Some(tree).filter(extendsFromType(_, context.constructs))
 
     //find all aggregate function definitions
@@ -28,98 +42,84 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
       def nameAllowed(name : String) : Boolean = {
         name match {
           case _  if name.contains("init") => false
+          case _  if name.contains("apply") => false
           case _  if name.contains("main") => false
           case _ => ! context.aggregateFunctions.contains(name)
         }
       }
+
       def functionAllowed(funDef : DefDef) : Boolean = !funDef.rhs.isEmpty && nameAllowed(funDef.symbol.fullName)
+
       tree match {
-        case defDef: DefDef if functionAllowed(defDef) =>  defDef :: tree.children.flatMap(findAllConstructs)
+        case defDef: DefDef if functionAllowed(defDef) => defDef :: tree.children.flatMap(findAllConstructs)
         case _ => tree.children.flatMap(findAllConstructs)
       }
     }
 
-    override def run(): Unit = {
-      echoPhaseSummary(this)
-      currentRun.units foreach applyPhase
-      markAggregateConstructors()
-    }
-
     private def markAggregateConstructors(): Unit = {
-      val functionsDefMap = functionsDef.map(funDef => funDef.symbol.fullName -> funDef).toMap
-      functionsDefMap.foreach(resolveType(_, functionsDefMap))
+      val nameLinkToFunction = functionsDef.map(funDef => funDef.symbol.fullName -> funDef).toMap
+      nameLinkToFunction.foreach(resolveType(_, nameLinkToFunction))
     }
 
-    private def resolveType(defDef: (String, DefDef), functionDefMap: Map[String, DefDef]): Boolean = {
-      val (name, funDef) = defDef
-      global.inform("resolving:" + name)
-
-      if(resolvingSet.contains(name)) {
-        return false
-      }
-
-      resolvingSet += name
-
-      def expressions(tree : Tree) : List[Tree] = tree match {
-        case Block(_, _) => tree.children
-        case _ => List(tree)
-      }
+    private def resolveType(nameToDefinition: (String, DefDef), nameLinkToFunction: Map[String, DefDef]): Boolean = {
+      val (name, funDef) = nameToDefinition
 
       def resolveReturnType(tree : Tree) : AggregateType = {
-        val lastExp = expressions(tree).last
-        context.functionFromTree(lastExp) match {
+        val lastExp = expressionsSequence(tree).last
+        context.extractAggFunctionFromTree(lastExp) match {
           case None => T
           case Some(fun) => fun.returns
         }
       }
-
-      def incompatibleType(types : Seq[AggregateType]) = types.contains(L) && types.contains(F)
-
-      def typeFromCompatibleTypes(types : Seq[AggregateType]) : AggregateType = types match {
-        case _ if types.contains(L) => L
-        case _ if types.contains(F) => F
-        case _ if types.nonEmpty => types.head
-        case _ => T
-      }
-      //TODO CLARIFY THIS METHOD
-      def extractArgTypeFrom(apply : Apply, aggFun : AggregateFunction, argDef : Tree) : Seq[AggregateType] = {
-        aggFun.args.zipWithIndex.collect {
-          case (argBlock, index) => val currentBlock = uncurry(apply, index)
-            currentBlock.args.zipWithIndex.collect {
-              case (applyArg, index) if (applyArg.symbol == argDef.symbol) =>
-                try {
-                  argBlock(index)
-                } catch {
-                  case exc : IndexOutOfBoundsException =>
-
-                    println(index, aggFun, apply.symbol.fullName, "BLOCK = " + argBlock, "block" + currentBlock.args)
-                    null
-                }
-            }
-        }.flatten
-      }
+      //TODO improve, expand each block during valutation, clarify
       def resolveArg(argDef : Tree) : AggregateType = {
-        val bodyExpr = expressions(funDef.rhs)
-        val typesFromBody = bodyExpr.collect {
-          case apply : Apply => context.functionFromTree(apply) match {
-            case Some(aggFun) => extractArgTypeFrom(apply, aggFun, argDef)
-            case None => functionDefMap.get(apply.symbol.fullName) match {
-              case Some(defDef) =>
-                val resolved = resolveType(apply.symbol.fullName -> defDef, functionDefMap)
-                if(resolved) {
-                  extractArgTypeFrom(apply, context.functionFromTree(apply).get, argDef)
-                } else {
-                  List.empty
-                }
-              case _ => List.empty
-            }
-          }
-        }.flatten
-        if(incompatibleType(typesFromBody)) {
+        val bodyExprs = expressionsSequence(funDef.rhs)
+        val typesFounded = extractAllArgType(bodyExprs, argDef)
+
+        if(incompatibleType(typesFounded)) {
           error("incompatible aggregate type: pay attention in use of local and field types..")
         }
-        typeFromCompatibleTypes(typesFromBody)
+
+        val aggType = typeFromCompatibleTypes(typesFounded)
+        context.aggArgMap += argDef.symbol -> aggType
+        aggType
       }
+
+      def extractAllArgType(bodyExpressions : Seq[Tree], argDef : Tree) : Seq[AggregateType] = bodyExpressions.collect {
+        case functionCall : Apply => context.extractAggFunctionFromTree(functionCall) match {
+          case Some(aggFun) => extractArgTypeFrom(functionCall, aggFun, argDef)
+          case None =>
+            nameLinkToFunction.get(functionCall.symbol.fullName) match {
+              case Some(aggUnsolvedFunction) => resolveInDepth(aggUnsolvedFunction, functionCall, argDef)
+              case _ => List.empty
+            }
+        }
+      }.flatten
+
+      def resolveInDepth(aggUnsolvedFunction : DefDef, functionCall : Apply, argDef : Tree): Seq[AggregateType] = {
+        if (resolveType(functionCall.symbol.fullName -> aggUnsolvedFunction, nameLinkToFunction)) {
+          extractArgTypeFrom(functionCall, context.extractAggFunctionFromTree(functionCall).get, argDef)
+        } else {
+          List.empty
+        }
+      }
+
+      //TODO CLARIFY THIS METHOD
+      def extractArgTypeFrom(apply : Apply, aggDef : AggregateFunction, argDef : Tree) : Seq[AggregateType] = {
+        aggDef.argsReversed.zipWithIndex.collect {
+          case (argBlock, index) => val currentBlock = uncurry(apply, index)
+            currentBlock.args.zipWithIndex.collect {
+              case (applyArg, index) if (applyArg.symbol == argDef.symbol) => argBlock(index)
+            }
+        }.flatten
+      }
+
+      //due recursion problems, this condiction allow to avoid stack overflow in case of nested function recursion
+      if(resolvingSet.contains(name)) {
+        return false
+      }
+      resolvingSet += name
+
       val args = funDef.vparamss
         .map(params => block(params.filter(! _.symbol.isImplicit).map(resolveArg):_*))
         .filter(_.nonEmpty)
@@ -133,9 +133,18 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
       true
     }
   }
+
+  private def typeFromCompatibleTypes(types : Seq[AggregateType]) : AggregateType = types match {
+    case _ if types.contains(L) => L
+    case _ if types.contains(F) => F
+    case _ if types.nonEmpty => types.head
+    case _ => T
+  }
+
+  private def incompatibleType(types : Seq[AggregateType]) = types.contains(L) && types.contains(F)
 }
 object DiscoverComponent extends ComponentDescriptor  {
-  override def name: String = "scafi-discover"
+  override def name: String = "discover"
 
   override val runsBefore: List[String] = List(TypeCheckComponent.name)
 

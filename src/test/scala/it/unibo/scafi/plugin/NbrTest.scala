@@ -21,7 +21,7 @@ class NbrTest extends PluginTest(false) {
     nestedNbr.hasErrors shouldBe true
     nestedNbr.errors.contains(aggregateTypeError(nbrSig, L, F)) shouldBe true
     /*
-    TODO think how to manage nested constructor. if is not accepted inside...
+    //TODO think how to manage nested constructor. if is not accepted inside...
     val hideNestedNbr = compiler.compile(
       writeInMain(
         """
@@ -39,8 +39,7 @@ class NbrTest extends PluginTest(false) {
     ).stripMargin)
     hideNestedNbr.hasErrors shouldBe true
     hideNestedNbr.errors.contains(aggregateTypeError(nbrSig, L, F)) shouldBe true
-
-     */
+    */
   }
 
   "Scafi plugin" should "allow normal usage of nbr" in {

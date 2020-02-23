@@ -1,6 +1,6 @@
 package it.unibo.scafi.plugin
 
-import it.unibo.scafi.definition.AggregateFunction
+import it.unibo.scafi.definition.{AggregateFunction, AggregateType}
 
 import scala.tools.nsc.Global
 import scala.tools.nsc.plugins.PluginComponent
@@ -22,11 +22,13 @@ abstract class AbstractComponent(protected val context : ComponentContext, prote
   def disable() : Unit = componentEnabled = false
 
   private var errorsEnabled = true
+
   def error(reason : String, pos : Position) : Unit = if(errorsEnabled) {
     globalError(pos, reason)
   } else {
     warning(pos, reason)
   }
+
   def error(reason : String) : Unit = if(errorsEnabled) {
     globalError(reason)
   } else {
@@ -37,6 +39,8 @@ abstract class AbstractComponent(protected val context : ComponentContext, prote
   //by default, component doesn't make anything.
   def processOption(optionName : String, value : String) : Unit = (optionName, value) match {
     case ("error", "disable") => this.errorsEnabled = false
+    case ("all", "disable") => this.disable()
+    case (`phaseName`, "disable") => this.disable()
     case _ =>
   }
   protected def hasSameName(symbol : Symbol, name : String) : Boolean = symbol.fullName == name
@@ -87,6 +91,11 @@ abstract class AbstractComponent(protected val context : ComponentContext, prote
     case (n, Apply(fun : Apply, _)) => uncurry(fun, n - 1)
     case _ => apply
   }
+
+  protected def expressionsSequence(tree : Tree) : Seq[Tree] = tree match {
+    case Block(_, _) => tree.children
+    case _ => List(tree)
+  }
 }
 
 /**
@@ -99,9 +108,11 @@ case class ComponentContext(global : Global,
                             constructs : String,
                             var aggregateFunctions : Map[String, AggregateFunction]
                            ) {
-  def functionFromName(name : String) : Option[AggregateFunction] = aggregateFunctions.get(name)
+  var aggArgMap : Map[Global#Symbol, AggregateType] = Map.empty
 
-  def functionFromTree(tree : Global#Tree) = tree.symbol match {
+  def extractAggFunctionFromName(name : String) : Option[AggregateFunction] = aggregateFunctions.get(name)
+
+  def extractAggFunctionFromTree(tree : Global#Tree) = tree.symbol match {
     case null => None
     case sym => aggregateFunctions.get(sym.fullName)
   }

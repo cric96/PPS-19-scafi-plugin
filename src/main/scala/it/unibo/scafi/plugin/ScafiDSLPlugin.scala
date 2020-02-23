@@ -1,9 +1,9 @@
 package it.unibo.scafi.plugin
 
-import it.unibo.scafi.definition.{AggregateFunction, AggregateType, ArrowType, F, L, T}
+import it.unibo.scafi.definition.{AggregateFunction, F, L, T}
 
 import scala.tools.nsc.Global
-import scala.tools.nsc.plugins.{Plugin, PluginComponent}
+import scala.tools.nsc.plugins.Plugin
 
 /**
   * This plugin support compile-time checking in the aggregate programs.
@@ -20,10 +20,16 @@ class ScafiDSLPlugin(val global: Global) extends Plugin {
   //the term used to check and find the properties of aggregate program
   import AggregateFunction._
   private val baseClass = "it.unibo.scafi.core.Language.Constructs"
+  private val baseClassImpl = "it.unibo.scafi.core.Semantics.ConstructsSemantics"
+  //TODO make parametrizable with file.
   private val coreFunction = AggregateFunction.toMap(
     aggFun(s"$baseClass.nbr", returns = F, args(block(L))),
     aggFun(s"$baseClass.foldhood", returns = L, args(block(L), block((T,T) -> T), block(F))),
-    aggFun(s"$baseClass.rep", returns = L, args(block(L), block(T)))
+    aggFun(s"$baseClass.rep", returns = L, args(block(L), block(T))),
+    //because symbol is different from implementation!
+    aggFun(s"$baseClassImpl.nbr", returns = F, args(block(L))),
+    aggFun(s"$baseClassImpl.foldhood", returns = L, args(block(L), block((T,T) -> T), block(F))),
+    aggFun(s"$baseClassImpl.rep", returns = L, args(block(L), block(T)))
   )
   private val baseAggregateProgram = "it.unibo.scafi.core.Semantics.ProgramSchema"
   //the context used in all plugin components.
