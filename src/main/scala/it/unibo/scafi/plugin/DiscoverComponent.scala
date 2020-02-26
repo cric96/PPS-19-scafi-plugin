@@ -16,7 +16,7 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
   import global._
   import DiscoverComponent._
   var functionsDef : List[DefDef] = List.empty
-  var resolvingSet : Set[String] = Set.empty
+  var resolvingSet : Set[Symbol] = Set.empty
 
   override def newPhase(prev: Phase): Phase = new DiscoverPhase(prev)
 
@@ -44,7 +44,7 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
           case _  if name.contains("init") => false
           case _  if name.contains("apply") => false
           case _  if name.contains("main") => false
-          case _ => ! context.aggregateFunctions.contains(name)
+          case _ => context.extractAggFunctionFromName(name).isEmpty
         }
       }
 
@@ -57,13 +57,11 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
     }
 
     private def markAggregateConstructors(): Unit = {
-      val nameLinkToFunction = functionsDef.map(funDef => funDef.symbol.fullName -> funDef).toMap
-      nameLinkToFunction.foreach(resolveType(_, nameLinkToFunction))
+      val nameLinkToFunction = functionsDef.map(funDef => funDef.symbol -> funDef).toMap
+      functionsDef.foreach(resolveType(_, nameLinkToFunction))
     }
 
-    private def resolveType(nameToDefinition: (String, DefDef), nameLinkToFunction: Map[String, DefDef]): Boolean = {
-      val (name, funDef) = nameToDefinition
-
+    private def resolveType(funDef: DefDef, nameLinkToFunction: Map[Symbol, DefDef]): Boolean = {
       def resolveReturnType(tree : Tree) : AggregateType = {
         val lastExp = expressionsSequence(tree).last
         context.extractAggFunctionFromTree(lastExp) match {
@@ -77,11 +75,10 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
         val typesFounded = extractAllArgType(bodyExprs, argDef)
 
         if(incompatibleType(typesFounded)) {
-          error("incompatible aggregate type: pay attention in use of local and field types..")
+          error(incompatibleTypeError(argDef.symbol.nameString), argDef.pos)
         }
-
         val aggType = typeFromCompatibleTypes(typesFounded)
-        context.aggArgMap += argDef.symbol -> aggType
+        context.addArgumentType(argDef.symbol, aggType)
         aggType
       }
 
@@ -89,7 +86,7 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
         case functionCall : Apply => context.extractAggFunctionFromTree(functionCall) match {
           case Some(aggFun) => extractArgTypeFrom(functionCall, aggFun, argDef)
           case None =>
-            nameLinkToFunction.get(functionCall.symbol.fullName) match {
+            nameLinkToFunction.get(functionCall.symbol) match {
               case Some(aggUnsolvedFunction) => resolveInDepth(aggUnsolvedFunction, functionCall, argDef)
               case _ => List.empty
             }
@@ -97,7 +94,7 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
       }.flatten
 
       def resolveInDepth(aggUnsolvedFunction : DefDef, functionCall : Apply, argDef : Tree): Seq[AggregateType] = {
-        if (resolveType(functionCall.symbol.fullName -> aggUnsolvedFunction, nameLinkToFunction)) {
+        if (resolveType(aggUnsolvedFunction, nameLinkToFunction)) {
           extractArgTypeFrom(functionCall, context.extractAggFunctionFromTree(functionCall).get, argDef)
         } else {
           List.empty
@@ -107,7 +104,8 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
       //TODO CLARIFY THIS METHOD
       def extractArgTypeFrom(apply : Apply, aggDef : AggregateFunction, argDef : Tree) : Seq[AggregateType] = {
         aggDef.argsReversed.zipWithIndex.collect {
-          case (argBlock, index) => val currentBlock = uncurry(apply, index)
+          case (argBlock, index) =>
+            val currentBlock = uncurry(apply, index)
             currentBlock.args.zipWithIndex.collect {
               case (applyArg, index) if (applyArg.symbol == argDef.symbol) => argBlock(index)
             }
@@ -115,21 +113,21 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
       }
 
       //due recursion problems, this condiction allow to avoid stack overflow in case of nested function recursion
-      if(resolvingSet.contains(name)) {
+      if(resolvingSet.contains(funDef.symbol)) {
         return false
       }
-      resolvingSet += name
+      resolvingSet += funDef.symbol
 
       val args = funDef.vparamss
-        .map(params => block(params.filter(! _.symbol.isImplicit).map(resolveArg):_*))
+        .map(params => block(params.map(resolveArg):_*))
         .filter(_.nonEmpty)
 
       ///return type eval
       val returnType = resolveReturnType(funDef.rhs)
-      val aggFunDef = AggregateFunction(name, returnType, args)
+      val aggFunDef = AggregateFunction(funDef.symbol.fullName, returnType, args)
       global.inform(funDef.pos, resolveAggDefinition(aggFunDef))
-      c.aggregateFunctions += name -> aggFunDef
-      resolvingSet -= name
+      c.addAggregateFunction(funDef.symbol, aggFunDef)
+      resolvingSet -= funDef.symbol
       true
     }
   }
@@ -151,6 +149,8 @@ object DiscoverComponent extends ComponentDescriptor  {
   override val runsAfter: List[String] = List("refchecks")
 
   def resolveAggDefinition(aggFun : AggregateFunction) : String = "resolved:" + aggFun
+
+  def incompatibleTypeError(arg : String) : String = s"incompatible aggregate type in $arg: pay attention in use of local and field types.."
 
   def apply()(implicit c : ComponentContext) : DiscoverComponent = new DiscoverComponent(c)
 }

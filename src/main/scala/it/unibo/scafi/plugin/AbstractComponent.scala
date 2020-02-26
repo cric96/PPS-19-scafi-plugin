@@ -103,17 +103,24 @@ abstract class AbstractComponent(protected val context : ComponentContext, prote
   * @param global: the context of compilation
   * @param aggregateFunctions: the set of aggregate function to consider during this compilation.
   */
-case class ComponentContext(global : Global,
-                            aggregateProgram : String,
-                            constructs : String,
-                            var aggregateFunctions : Map[String, AggregateFunction]
-                           ) {
-  var aggArgMap : Map[Global#Symbol, AggregateType] = Map.empty
+class ComponentContext(val global : Global,
+                       val aggregateProgram : String,
+                       val constructs : String,
+                       private val aggregateFunctions : Map[String, AggregateFunction]
+                      ) {
+  private var aggArgMap : Map[Global#Symbol, AggregateType] = Map.empty
+  private var aggSymbolMap : Map[Global#Symbol, AggregateFunction] = Map.empty
+
+  def addAggregateFunction(symbol : Global#Symbol, aggDef : AggregateFunction): Unit = aggSymbolMap += symbol -> aggDef
+
+  def addArgumentType(symbol : Global#Symbol, aggType : AggregateType): Unit = aggArgMap += symbol -> aggType
 
   def extractAggFunctionFromName(name : String) : Option[AggregateFunction] = aggregateFunctions.get(name)
 
-  def extractAggFunctionFromTree(tree : Global#Tree) = tree.symbol match {
+  def extractArgType(arg : Global#Symbol) : Option[AggregateType] = aggArgMap.get(arg)
+
+  def extractAggFunctionFromTree(tree : Global#Tree): Option[AggregateFunction] = tree.symbol match {
     case null => None
-    case sym => aggregateFunctions.get(sym.fullName)
+    case sym => aggregateFunctions.get(sym.fullName).orElse(aggSymbolMap.get(sym))
   }
 }

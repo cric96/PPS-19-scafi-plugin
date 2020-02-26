@@ -48,7 +48,7 @@ case class ArrowType(args : Seq[AggregateType], returns : AggregateType) extends
 case class AggregateFunction(name : String, returns : AggregateType, args : Seq[ArgsBlock]) {
   val argsReversed = args.reverse
 
-  override def toString: String = s"$name${args.flatten.mkString("(", ",", ")")}: ${returns}"
+  override def toString: String = s"$name${args.map(_.mkString("(", ",", ")")).mkString("")}: ${returns}"
 }
 
 object AggregateFunction {

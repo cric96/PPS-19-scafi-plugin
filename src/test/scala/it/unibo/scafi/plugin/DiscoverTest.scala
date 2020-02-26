@@ -22,6 +22,19 @@ class DiscoverTest extends PluginTest {
         |""".stripMargin))
     report.info.contains(DiscoverComponent.resolveAggDefinition(otherDef)) shouldBe true
   }
+
+  "Scafi plugin" should "discover inconsistent type in aggregate definition" in {
+    val report = compiler.compile(writeInMain(
+      """
+        | def myDef[A](a : => A, b : => A) : A = {
+        |   nbr(a)
+        |   foldhood{b}{(x,y) => x}{a}
+        |}
+        |""".stripMargin))
+    report.hasErrors shouldBe true
+    report.errors.contains(DiscoverComponent.incompatibleTypeError("a")) shouldBe true
+  }
+
   /*
   //TODO! change logic inside discoverComponent
   "Scafi plugin" should "found should discover return type with value definition" in {

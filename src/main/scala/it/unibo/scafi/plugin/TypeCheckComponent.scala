@@ -68,13 +68,13 @@ class TypeCheckComponent(context : ComponentContext) extends AbstractComponent(c
     }
     //TODO Think how you can add index in error.
     private def checkArgsCorrectness(fun : AggregateFunction, aggregateType : AggregateType, argDefinition : Tree) = {
-      def checkTypeConsistency() = aggregateType match { //todo give a bettername
-          case F if !isFieldPresent(argDefinition) => error(aggregateTypeError(fun, F, L))
-          case L if isFieldPresent(argDefinition) => error(aggregateTypeError(fun, L, F))
+      def checkTypeConsistency(): Unit = aggregateType match { //todo give a bettername
+          case F if !isFieldPresent(argDefinition) => error(aggregateTypeError(fun, F, L), argDefinition.pos)
+          case L if isFieldPresent(argDefinition) => error(aggregateTypeError(fun, L, F), argDefinition.pos)
           case ArrowType(returns, args) => //TODO how to manage arrow type arguments?
           case _ =>
       }
-      context.aggArgMap.get(argDefinition.symbol) match {
+      context.extractArgType(argDefinition.symbol) match {
         case Some(tpe) if (tpe != aggregateType) => error(aggregateTypeError(fun, aggregateType, tpe))
         case _ => checkTypeConsistency()
       }

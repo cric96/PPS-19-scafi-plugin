@@ -33,7 +33,7 @@ class ScafiDSLPlugin(val global: Global) extends Plugin {
   )
   private val baseAggregateProgram = "it.unibo.scafi.core.Semantics.ProgramSchema"
   //the context used in all plugin components.
-  implicit val componentContext : ComponentContext = ComponentContext(g, baseAggregateProgram, baseClass, coreFunction)
+  implicit val componentContext : ComponentContext = new ComponentContext(g, baseAggregateProgram, baseClass, coreFunction)
   override val name: String = "scafi"
   override val components: List[AbstractComponent] = List(
     TransformComponent(),
@@ -51,5 +51,4 @@ class ScafiDSLPlugin(val global: Global) extends Plugin {
       components.foreach(_.processOption(splitted(0), splitted(1)))
     }
   }
-
 }
