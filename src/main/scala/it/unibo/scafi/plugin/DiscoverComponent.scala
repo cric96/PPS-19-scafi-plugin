@@ -84,7 +84,7 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
 
       def extractAllArgType(bodyExpressions : Seq[Tree], argDef : Tree) : Seq[AggregateType] = bodyExpressions.collect {
         case functionCall : Apply => context.extractAggFunctionFromTree(functionCall) match {
-          case Some(aggFun) => extractArgTypeFrom(functionCall, aggFun, argDef)
+          case Some(aggFun) => extractArgTypeFromApply(functionCall, aggFun, argDef)
           case None =>
             nameLinkToFunction.get(functionCall.symbol) match {
               case Some(aggUnsolvedFunction) => resolveInDepth(aggUnsolvedFunction, functionCall, argDef)
@@ -95,20 +95,23 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
 
       def resolveInDepth(aggUnsolvedFunction : DefDef, functionCall : Apply, argDef : Tree): Seq[AggregateType] = {
         if (resolveType(aggUnsolvedFunction, nameLinkToFunction)) {
-          extractArgTypeFrom(functionCall, context.extractAggFunctionFromTree(functionCall).get, argDef)
+          extractArgTypeFromApply(functionCall, context.extractAggFunctionFromTree(functionCall).get, argDef)
         } else {
           List.empty
         }
       }
 
       //TODO CLARIFY THIS METHOD
-      def extractArgTypeFrom(apply : Apply, aggDef : AggregateFunction, argDef : Tree) : Seq[AggregateType] = {
-        aggDef.argsReversed.zipWithIndex.collect {
-          case (argBlock, index) =>
-            val currentBlock = uncurry(apply, index)
-            currentBlock.args.zipWithIndex.collect {
-              case (applyArg, index) if (applyArg.symbol == argDef.symbol) => argBlock(index)
-            }
+      def extractArgTypeFromApply(apply : Apply, aggDef : AggregateFunction, argDef : Tree) : Seq[AggregateType] = {
+        val blocksUncurried = aggDef.argsReversed.zipWithIndex.map {
+          case (argsBlockAgg, index) => (argsBlockAgg, uncurry(apply, index))
+        }.collect {
+          case (argsBlockAgg, Some(argTree)) => (argsBlockAgg, argTree.args.zipWithIndex)
+        }
+        blocksUncurried.collect {
+          case (argsBlockAgg, args) => args.collect {
+            case (arg, index) if(arg.symbol == argDef.symbol) => argsBlockAgg(index)
+          }
         }.flatten
       }
 

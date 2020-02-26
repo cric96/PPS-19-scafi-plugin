@@ -7,10 +7,17 @@ import scala.tools.nsc.plugins.PluginComponent
 /**
   * abstract plugin component, define general structure of scafi plugin components,
   * has some utility function that could be used in the child components.
+  * a component could be disable with option passed to the compiler.
+  * To disable a component, you need to write:
+  *   -Pscafi:disable:<componentName>.
+  * each component has a component descriptor, that contains the main information to describe a component.
+  * The context is shared from all component, can be enrich from some phase.
   */
 abstract class AbstractComponent(protected val context : ComponentContext, protected val descriptor: ComponentDescriptor) extends PluginComponent {
   override val global: Global = context.global
-  import global._
+
+  import global._ //each type in this context is describe in the global, to simply code is better to import all the object
+
   private var componentEnabled = true
 
   override val phaseName: String = descriptor.name
@@ -18,11 +25,16 @@ abstract class AbstractComponent(protected val context : ComponentContext, prote
   override val runsAfter: List[String] = descriptor.runsAfter
 
   override val runsBefore: List[String] = descriptor.runsBefore
-
-  def disable() : Unit = componentEnabled = false
+  //allow to disable a component in the compilation phases
+  private def disable() : Unit = componentEnabled = false
 
   private var errorsEnabled = true
 
+  /**
+    *
+    * @param reason
+    * @param pos
+    */
   def error(reason : String, pos : Position) : Unit = if(errorsEnabled) {
     globalError(pos, reason)
   } else {
@@ -36,14 +48,24 @@ abstract class AbstractComponent(protected val context : ComponentContext, prote
   }
 
   override def enabled: Boolean = componentEnabled
-  //by default, component doesn't make anything.
-  def processOption(optionName : String, value : String) : Unit = (optionName, value) match {
-    case ("error", "disable") => this.errorsEnabled = false
-    case ("all", "disable") => this.disable()
-    case (`phaseName`, "disable") => this.disable()
-    case _ =>
+
+  /**
+    * the option supported in common are:
+    *   disable:error => each error became a warning
+    *   disable:* => no component are enable
+    *   disable:<component_name> only a component is disabled
+    */
+  def processOption(optionName : String, value : String) : Unit = {
+    import ComponentOption._
+    (optionName, value) match {
+      case (`disableOption`, `errorValue`) => this.errorsEnabled = false
+      case (`disableOption`, `allValue`) => this.disable()
+      case (`disableOption`, `phaseName`) => this.disable()
+      case _ =>
+    }
   }
-  protected def hasSameName(symbol : Symbol, name : String) : Boolean = symbol.fullName == name
+
+  protected def symbolMatchWithName(symbol : Symbol, name : String) : Boolean = symbol.fullName == name
   /**
     * return the symbol from tree if certain condition are satisfied.
     * @param tree : object where check the condition passed
@@ -60,7 +82,7 @@ abstract class AbstractComponent(protected val context : ComponentContext, prote
     })
 
     symbol.map(_.selfType.baseClasses)
-      .map(classNames => classNames.exists(hasSameName(_, typeName)))
+      .map(classNames => classNames.exists(symbolMatchWithName(_, typeName)))
       .exists(p => p)
   }
 
@@ -86,10 +108,10 @@ abstract class AbstractComponent(protected val context : ComponentContext, prote
     }
   }
   //TODO rethink a better solution for uncurry function definition
-  protected def uncurry(apply : Apply, uncurryTimes : Int): Apply = (uncurryTimes,apply) match {
-    case (0,_) => apply
+  protected def uncurry(apply : Apply, uncurryTimes : Int): Option[Apply] = (uncurryTimes,apply) match {
+    case (0,_) => Some(apply)
     case (n, Apply(fun : Apply, _)) => uncurry(fun, n - 1)
-    case _ => apply
+    case _ => None
   }
 
   protected def expressionsSequence(tree : Tree) : Seq[Tree] = tree match {
@@ -123,4 +145,10 @@ class ComponentContext(val global : Global,
     case null => None
     case sym => aggregateFunctions.get(sym.fullName).orElse(aggSymbolMap.get(sym))
   }
+}
+
+object ComponentOption {
+  val disableOption : String = "disable"
+  val errorValue : String = "error"
+  val allValue : String = "*"
 }

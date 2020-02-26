@@ -9,9 +9,9 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class PluginArgumentsTest extends PluginTest {
   val repSig = aggFun("it.unibo.scafi.core.Language.Constructs.rep", returns = L, args(block(L), block(T)))
-  val compilerNoWraps = new ScafiCompilerPlatform(false, "transform=disable")
-  val compilerPluginDisable = new ScafiCompilerPlatform(false, "all=disable")
-  val compilerNoError = new ScafiCompilerPlatform(false, "error=disable")
+  val compilerNoWraps = new ScafiCompilerPlatform(false, "disable:transform")
+  val compilerPluginDisable = new ScafiCompilerPlatform(false, "disable:*")
+  val compilerNoError = new ScafiCompilerPlatform(false, "disable:error")
   //Same test of AggregateWrapsTest, but with wrap=disable option.
   "Scafi plugin with wrap component disabled" should "no wraps lambda using aggregate" in {
     val (singleCode, singleReport) = compilerNoWraps.transform(writeInMain {
@@ -45,9 +45,8 @@ class PluginArgumentsTest extends PluginTest {
         | rep{nbr{10}}{x => x}
     """.stripMargin
     })
-
+    println(report.errors)
     report.hasErrors shouldBe false
     report.hasWarnings shouldBe false
-
   }
 }

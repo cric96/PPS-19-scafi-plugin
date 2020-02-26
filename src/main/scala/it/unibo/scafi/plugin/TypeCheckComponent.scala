@@ -60,8 +60,10 @@ class TypeCheckComponent(context : ComponentContext) extends AbstractComponent(c
 
     private def checkAggFunCorrectness(function : AggregateFunction, applyTree : Apply) = {
       val blockWithArgTree = function.argsReversed
-                                  .zipWithIndex
-                                  .map { case (block, i) => block -> uncurry(applyTree, i).args}
+          .zipWithIndex
+          .map { case (block, i) => block -> uncurry(applyTree, i)}
+          .collect { case (block, _ @ Some(uncurried)) => block -> uncurried.args }
+
       blockWithArgTree
         .flatMap { case (block, argsTree) => block.zip(argsTree) }
         .foreach { case (aggType, argTree) => checkArgsCorrectness(function, aggType, argTree)}
