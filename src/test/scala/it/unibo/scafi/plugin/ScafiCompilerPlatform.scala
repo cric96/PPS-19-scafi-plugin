@@ -1,33 +1,27 @@
 package it.unibo.scafi.plugin
 
-import java.io.File
-import java.net.{URL, URLClassLoader}
-import java.nio.file.Files
-
-import scala.reflect.internal.util.{BatchSourceFile, Position}
+import scala.reflect.internal.util.Position
 import scala.tools.nsc.io.VirtualDirectory
 import scala.tools.nsc.reporters.AbstractReporter
 import scala.tools.nsc.{Global, Settings}
 
-class ScafiCompilerPlatform(verbose : Boolean) {
+class ScafiCompilerPlatform(verbose : Boolean, pluginOptions : String *) {
   private val settings = new Settings() //setting used to create the context of compiler
   settings.embeddedDefaults(this.getClass.getClassLoader)
   settings.verbose.value = verbose
+  pluginOptions.foreach(setting => settings.pluginOptions.appendToValue(s"scafi:$setting"))
   private val virtualDir = new VirtualDirectory("(memory)", None)
   settings.outputDirs.setSingleOutput(virtualDir) //all compile source are store in memory
   settings.usejavacp.value = true //used to find the scala compiler by the global
   //create global, attach the new plugin phases, using a report to check error and warning
   private def createGlobal(report : AbstractReporter) : Global = {
     new Global(settings,report) {
-      override protected def computeInternalPhases () {
-        super.computeInternalPhases
-        //add the phase added on this module
-        for (phase <- new ScafiDSLPlugin(this).components)
-          phasesSet += phase
-      }
+      override protected def loadRoughPluginsList() = new ScafiDSLPlugin(this) :: super.loadRoughPluginsList()
     }
   }
-
+  private def currentCompiled(run : Global#Run) : String = {
+    run.units.map(_.body.toString()).mkString("\n")
+  }
   /**
     * compile a scala code passed as a string
     * @param code: the scala code.
@@ -38,27 +32,28 @@ class ScafiCompilerPlatform(verbose : Boolean) {
     val reporter = new DebuggerReporter(settings)
     val global = createGlobal(reporter)
     val compilation  = new global.Run()
-    val sources = List(global.newSourceFile(code))
-    compilation.compileSources(sources)
-    //a way to check code after a phase is to used compiltation.units
-    try {
-      reporter.report().appendCode(compilation.units.map(_.body.toString()))
-    } finally {
-      reporter.clearOutputCount()
-    }
+    val codeUnit = global.newCompilationUnit(code)
+    compilation.compileUnits(List(codeUnit), compilation.parserPhase)
+    reporter.report()
+  }
+
+  def transform(code : String) : (String, CompilationReport) = {
+    val reporter = new DebuggerReporter(settings)
+    val global = createGlobal(reporter)
+    val transform = new global.Run()
+    val codeUnit = global.newCompilationUnit(code)
+    transform.compileLate(codeUnit)
+    (currentCompiled(transform), reporter.report())
   }
 }
 case class CompilationReport(errors : List[String],
                              warnings: List[String],
-                             info : List[String],
-                             code : List[String] = List()) {
+                             info : List[String]) {
   def hasErrors : Boolean = errors.nonEmpty
 
   def hasWarnings : Boolean = warnings.nonEmpty
 
   def hasInfo : Boolean = info.nonEmpty
-
-  def appendCode(compiledCode : Iterator[String]) : CompilationReport = this.copy(code = compiledCode.toList)
 }
 
 class DebuggerReporter(override val settings: Settings) extends AbstractReporter {
@@ -76,43 +71,5 @@ class DebuggerReporter(override val settings: Settings) extends AbstractReporter
 
   def clearOutputCount(): Unit = outputMap = initInfoMap()
 
-
   def report() : CompilationReport = CompilationReport(outputMap(ERROR.id), outputMap(WARNING.id), outputMap(INFO.id))
-}
-
-final class ReplClassloader(parent: ClassLoader) extends ClassLoader(parent)  {
-  override def getResource(name: String): URL = {
-    // Rather pass `settings.usejavacp.value = true` (which doesn't work
-    // under SBT) we do the same as SBT and respond to a resource request
-    // by the compiler for the magic name "app.classpath", write the JAR files
-    // from our classloader to a temporary file, and return that as the resource.
-    if (name == "app.class.path") {
-      def writeTemp(content: String): File = {
-        val f = File.createTempFile("classpath", ".txt")
-        //          IO.writeFile(f, content)
-        val p = new java.io.PrintWriter(f)
-        p.print(content)
-        p.close
-        f
-      }
-      println("Attempting to configure Scala classpath based on classloader: " + getClass.getClassLoader)
-      val superResource = super.getResource(name)
-      if (superResource != null) superResource // In SBT, let it do it's thing
-      else getClass.getClassLoader match {
-        case u: URLClassLoader =>
-          // Rather pass `settings.usejavacp.value = true` (which doesn't work
-          // under SBT) we do the same as SBT and respond to a resource request
-          // by the compiler for the magic name "app.classpath"
-          println("yay...")
-          val files = u.getURLs.map(x => new java.io.File(x.toURI))
-          val f = writeTemp(files.mkString(File.pathSeparator))
-          println(Files.readAllLines(f.toPath))
-          f.toURI.toURL
-        case other =>
-          // We're hosed here.
-          println("uh-oh")
-          null
-      }
-    } else super.getResource(name)
-  }
 }

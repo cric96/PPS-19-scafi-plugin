@@ -1,4 +1,5 @@
 # PPS-19, Scafi compiler plugin ![](https://github.com/cric96/PPS-19-scafi-plugin/workflows/Scala%20CI/badge.svg?branch=develop)
+
 This project aims to define a plugin for the scala compiler that add several checks to the DSL built in the scafi framework.
 
 At the moment, the plugin can:
@@ -63,7 +64,6 @@ Some useful links:
 - scala compiler doc : https://www.scala-lang.org/api/2.12.3/scala-compiler/scala/tools/nsc/index.html
 - quasi qoute intro : https://docs.scala-lang.org/overviews/quasiquotes/intro.html
 
-[comment]: <> "TODO, write a TL;DR to resume the main concept to create a compiler plugin"
 
 Done by Gianluca Aguzzi
 

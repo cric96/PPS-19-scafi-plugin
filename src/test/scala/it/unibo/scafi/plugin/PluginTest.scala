@@ -7,25 +7,40 @@ class PluginTest(verbose : Boolean = false) extends FlatSpec with BeforeAndAfter
   override def beforeEach(): Unit = {
     compiler = new ScafiCompilerPlatform(verbose)
   }
-  /*NB! it is the correct way? it is better to depends on scafi-core? it is a good idea using annotations?*/
   protected val commonCode =
     """
-     |trait ProgramSchema
-     |trait AggregateProgram extends ProgramSchema {
-     |  def nbr[A](expr: => A): A = expr
-     |  def foldhood[A](init: => A)(aggr: (A, A) => A)(expr: => A): A = expr
-     |  def rep[A](init: =>A)(fun: (A) => A): A = init
+     |package it.unibo.scafi.core
+     |trait Language {
+     |  trait Constructs {
+     |    def nbr[A](expr: => A): A = expr
+     |    def foldhood[A](init: => A)(aggr: (A, A) => A)(expr: => A): A = expr
+     |    def rep[A](init: =>A)(fun: (A) => A): A = init
+     |    def aggregate[A](f: => A) : A = f
+     |  }
      |}
+     |trait RichLanguage extends Language {
+     |  trait Lib {
+     |    this: Constructs =>
+     |      def nbrRange() : Double = nbr(10.0)
+     |  }
+     |}
+     |trait Semantics extends RichLanguage {
+     |  trait ProgramSchema extends Constructs with Lib {
+     |    def main() : Unit
+     |  }
+     |}
+     |object core extends Semantics
     """.stripMargin
 
   protected def writeInMain(mainBody : String): String = {
     s"""
       $commonCode
-       class Main extends AggregateProgram {
-          def main(x : Int) : Unit = {
-            $mainBody
-          }
+      import core._
+      class Main extends ProgramSchema {
+        override def main() : Unit = {
+          $mainBody
         }
+      }
     """.stripMargin
   }
 }
