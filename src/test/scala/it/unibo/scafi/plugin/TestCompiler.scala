@@ -1,5 +1,6 @@
 package it.unibo.scafi.plugin
 
+import it.unibo.scafi.plugin.component.PluginTest
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 

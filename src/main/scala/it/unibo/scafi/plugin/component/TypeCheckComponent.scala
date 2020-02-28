@@ -1,6 +1,7 @@
-package it.unibo.scafi.plugin
+package it.unibo.scafi.plugin.component
 
-import it.unibo.scafi.definition.{AggregateFunction, AggregateType, ArrowType, F, L}
+import it.unibo.scafi.definition._
+import it.unibo.scafi.plugin.common.{AbstractComponent, ComponentContext, ComponentDescriptor}
 
 import scala.tools.nsc.Phase
 
@@ -19,19 +20,17 @@ class TypeCheckComponent(context : ComponentContext) extends AbstractComponent(c
     * @param prev the previous phase in the compilation pipeline
     */
   class TypeCheckPhase(prev: Phase) extends StdPhase(prev) {
-    private def extractAggregateProgram(tree : Tree) : Option[Tree] = Some(tree).filter(extendsFromType(_, context.aggregateProgram))
-
-    private def extractAggregateFunction(tree : Tree) : Option[AggregateFunction] =  context.extractAggFunctionFromTree(tree)
-    //here the magic happens, verify the correctness of the programs
+    //it verifies the correctness of the programs
     override def apply(unit: CompilationUnit): Unit = {
       global.inform(phaseName)
+      def extractAggregateProgram(tree : Tree) : Option[Tree] = Some(tree).filter(extendsFromType(_, context.aggregateProgram))
+      //it searches deeply for the presence of a main starting from the root of an AST
       def searchMainBody(tree : Tree) : Option[Tree] = extractAggregateMain(tree) match {
         case None => tree.children.map(searchMainBody).collectFirst {
           case Some(mainBody) => mainBody
         }
         case Some(defMain) => Some(defMain.rhs)
       }
-
       //extract all aggregate main, and check the properties
       search(unit.body)(extractAggregateProgram).map(searchMainBody).collect {
         case Some(mainTree) => mainTree
@@ -39,12 +38,14 @@ class TypeCheckComponent(context : ComponentContext) extends AbstractComponent(c
         evalAggregateMain  //here starts program evaluation
       }
     }
-    private def evalAggregateMain(tree : Tree) : Unit = {
-      //in this def, there are all the checking in the programs
-      ifPresenceCheck(tree)
-      aggregateFunctionCorrectness(tree)
-    }
 
+    private def evalAggregateMain(tree : Tree) : Unit = {
+      //it checks the presence of unexpected if inside aggregate programs
+      ifPresenceCheck(tree)
+      //it checks the presence of erroneous types inside aggregate programs
+      aggregateFunctionsCorrectness(tree)
+    }
+    //it checks, starting from a specific root, if there are some if in its children
     private def ifPresenceCheck(tree : Tree): Unit = tree match {
       case If(_,_,_) =>
         warning(tree.pos, ifInfoString)
@@ -52,42 +53,47 @@ class TypeCheckComponent(context : ComponentContext) extends AbstractComponent(c
       case _ =>
         tree.children.foreach(ifPresenceCheck)
     }
-
-    private def aggregateFunctionCorrectness(tree : Tree) : Unit = (tree, extractAggregateFunction(tree)) match {
-      case (apply : Apply, Some(ag)) => checkAggFunCorrectness(ag, apply)
-      case _ => tree.children.foreach(aggregateFunctionCorrectness)
+    //it checks the presence of aggregate types inconsistency during compilation
+    private def aggregateFunctionsCorrectness(tree : Tree) : Unit = (tree, extractAggregateFunction(tree)) match {
+      case (apply : Apply, Some(ag)) =>
+        checkAggFunCorrectness(ag, apply)
+      case _ => tree.children.foreach(aggregateFunctionsCorrectness)
     }
 
     private def checkAggFunCorrectness(function : AggregateFunction, applyTree : Apply) = {
-      val blockWithArgTree = function.argsReversed
-          .zipWithIndex
-          .map { case (block, i) => block -> uncurry(applyTree, i)}
+      val blockWithArgTree = function.argsReversed //associate to each argument block the corresponding AST
+          .zipWithIndex //used to jump across all the arguments
+          .map { case (block, i) => block -> uncurrying(applyTree, i)}
           .collect { case (block, _ @ Some(uncurried)) => block -> uncurried.args }
 
       blockWithArgTree
-        .flatMap { case (block, argsTree) => block.zip(argsTree) }
-        .foreach { case (aggType, argTree) => checkArgsCorrectness(function, aggType, argTree)}
+        .flatMap { case (block, argsTree) => block.zip(argsTree) } //it associates the AST to each argument
+        .foreach { case (aggType, argTree) => checkArgsCorrectness(function, aggType, argTree)} //check for type correctness
     }
-    //TODO Think how you can add index in error.
+
     private def checkArgsCorrectness(fun : AggregateFunction, aggregateType : AggregateType, argDefinition : Tree) = {
-      def checkTypeConsistency(): Unit = aggregateType match { //todo give a bettername
+      // check for type consistency
+      def checkTypeConsistency(): Unit = aggregateType match {
           case F if !isFieldPresent(argDefinition) => error(aggregateTypeError(fun, F, L), argDefinition.pos)
           case L if isFieldPresent(argDefinition) => error(aggregateTypeError(fun, L, F), argDefinition.pos)
           case ArrowType(returns, args) => //TODO how to manage arrow type arguments?
           case _ =>
       }
-      context.extractArgType(argDefinition.symbol) match {
+      context.extractTypeFromSymbol(argDefinition.symbol) match {
+          //the AST could be already marked, in this case it has to be checked type equality
         case Some(tpe) if (tpe != aggregateType) => error(aggregateTypeError(fun, aggregateType, tpe))
         case _ => checkTypeConsistency()
       }
-      argDefinition.children.foreach(aggregateFunctionCorrectness)
+      argDefinition.children.foreach(aggregateFunctionsCorrectness)
     }
-
+    //check if exists a call that return a field
     private def isFieldPresent(tree : Tree) : Boolean = {
       tree.children.map(extractAggregateFunction)
         .collect { case Some(aggFun) => aggFun }
         .exists(_.returns == F)
     }
+
+    private def extractAggregateFunction(tree : Tree) : Option[AggregateFunction] =  context.extractAggFunctionFromTree(tree)
   }
   override val descriptor: ComponentDescriptor = TypeCheckComponent
 }

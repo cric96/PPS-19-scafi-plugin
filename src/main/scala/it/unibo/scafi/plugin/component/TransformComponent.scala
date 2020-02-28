@@ -1,8 +1,16 @@
-package it.unibo.scafi.plugin
+package it.unibo.scafi.plugin.component
+
+import it.unibo.scafi.plugin.common.{AbstractComponent, ComponentContext, ComponentDescriptor}
 
 import scala.tools.nsc.ast.TreeDSL
 import scala.tools.nsc.transform.Transform
+//TODO transform works before "namer" does, so there aren't any simbols. It can be built later, maybe.
 
+//this component is a transform and modify the resulting AST.
+// It is better to keep divided the two parts.
+/**
+  * This component modifies the AST in order to support scafi syntax.
+  */
 class TransformComponent(val c : ComponentContext) extends AbstractComponent(c, TransformComponent)
   with Transform
   with TreeDSL {
@@ -21,13 +29,13 @@ class TransformComponent(val c : ComponentContext) extends AbstractComponent(c, 
       }
     }
   }
-
+  //It verifies if there are lambdas and in that case it wraps them with aggregate
   private object WrapFunction extends Transformer {
     override def transform(tree: global.Tree): global.Tree = {
       tree match {
-        case q"(..$args) => aggregate($body)" => super.transform(tree)
-        case q"(..$args) => { ..$body }" => q"(..$args) => aggregate{ ..$body }"
-        case _ => super.transform(tree)
+        case q"(..$args) => aggregate($body)" => super.transform(tree) //se già c'è aggregate, non si aggiunge di nuovo il mark
+        case q"(..$args) => { ..$body }" => q"(..$args) => aggregate{ ..$body }" //altrimenti si wrappa la lambda con aggregate
+        case _ => super.transform(tree) //in tutti gli altri casi non si fa niente
       }
     }
   }

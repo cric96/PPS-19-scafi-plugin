@@ -1,30 +1,31 @@
-package it.unibo.scafi.plugin
-import it.unibo.scafi.definition.{AggregateFunction, AggregateType, F, L, T}
-import AggregateFunction._
+package it.unibo.scafi.plugin.component
 
-import scala.tools.nsc.Phase
+import it.unibo.scafi.definition._
+import it.unibo.scafi.plugin.common.{AbstractComponent, ComponentContext, ComponentDescriptor}
+
+import scala.tools.nsc.{Global, Phase}
 /*
   tips for solving overloading methods:
     matching with tree need another parameter, the position where the symbol is defined. with this, the
     function are unique.
  */
 /**
-  *
-  * @param c
+  * this component has to search for function definition in a specific trait, starting from
+  * a set of aggregate functions.
   */
 class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, DiscoverComponent){
-  import global._
   import DiscoverComponent._
-  var functionsDef : List[DefDef] = List.empty
-  var resolvingSet : Set[Symbol] = Set.empty
+  import global._
+  var functionsDef : List[DefDef] = List.empty //insieme di funzioni aggregate da marcare
+  var resolvingSet : Set[Symbol] = Set.empty //set usato per evitare problemi associati alla ricorsione
 
   override def newPhase(prev: Phase): Phase = new DiscoverPhase(prev)
 
   class DiscoverPhase(prev : Phase) extends StdPhase(prev) {
-    override def run(): Unit = {
+    override def run(): Unit = {  //run viene chiamato in cascata alla fase precedente, in questo punto accedo (virtualmente) a tutti i sorgenti
       echoPhaseSummary(this)
-      currentRun.units foreach applyPhase
-      markAggregateConstructors()
+      currentRun.units foreach applyPhase //chiamo apply per ogni file di compilazione
+      markAggregateConstructors() //effettuo il marking dei vari costrutti trovati
     }
 
     private def extractConstructsDefinition(tree: Tree): Option[Tree] = Some(tree).filter(extendsFromType(_, context.constructs))
@@ -32,36 +33,37 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
     //find all aggregate function definitions
     override def apply(unit: global.CompilationUnit): Unit = {
       inform(phaseName)
-      val functionFoundInUnit = search(unit.body)(extractConstructsDefinition) flatMap {
+      val functionsFoundInUnit = search(unit.body)(extractConstructsDefinition) flatMap {
         findAllConstructs
       }
-      functionsDef :::= functionFoundInUnit
+      functionsDef :::= functionsFoundInUnit
     }
 
     private def findAllConstructs(tree: Tree): Seq[DefDef] = {
-      def nameAllowed(name : String) : Boolean = {
-        name match {
-          case _  if name.contains("init") => false
-          case _  if name.contains("apply") => false
-          case _  if name.contains("main") => false
-          case _ => context.extractAggFunctionFromName(name).isEmpty
+      def nameAllowed(symbol : Global#Symbol) : Boolean = {
+        symbol.fullName match {
+          case name if name.contains("init") => false
+          case name if name.contains("apply") => false
+          case name if name.contains("main") => false
+          case _ => context.extractAggFunctionFromSymbol(symbol).isEmpty
         }
       }
 
-      def functionAllowed(funDef : DefDef) : Boolean = !funDef.rhs.isEmpty && nameAllowed(funDef.symbol.fullName)
+      def functionAllowed(funDef : DefDef) : Boolean = !funDef.rhs.isEmpty && nameAllowed(funDef.symbol)
 
       tree match {
-        case defDef: DefDef if functionAllowed(defDef) => defDef :: tree.children.flatMap(findAllConstructs)
+        case defDef: DefDef if functionAllowed(defDef) => defDef :: tree.children.flatMap(findAllConstructs) //dentro potrebbero essere altre definizioni a funzioni
         case _ => tree.children.flatMap(findAllConstructs)
       }
     }
-
+    //marking all the retrieved functions
     private def markAggregateConstructors(): Unit = {
       val nameLinkToFunction = functionsDef.map(funDef => funDef.symbol -> funDef).toMap
       functionsDef.foreach(resolveType(_, nameLinkToFunction))
     }
 
     private def resolveType(funDef: DefDef, nameLinkToFunction: Map[Symbol, DefDef]): Boolean = {
+      //TODO improve! it doesn't evaluate if the last expression is a simple value
       def resolveReturnType(tree : Tree) : AggregateType = {
         val lastExp = expressionsSequence(tree).last
         context.extractAggFunctionFromTree(lastExp) match {
@@ -69,7 +71,7 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
           case Some(fun) => fun.returns
         }
       }
-      //TODO improve, expand each block during valutation, clarify
+      //TODO improve, expand each block during evaluation,
       def resolveArg(argDef : Tree) : AggregateType = {
         val bodyExprs = expressionsSequence(funDef.rhs)
         val typesFounded = extractAllArgType(bodyExprs, argDef)
@@ -78,33 +80,32 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
           error(incompatibleTypeError(argDef.symbol.nameString), argDef.pos)
         }
         val aggType = typeFromCompatibleTypes(typesFounded)
-        context.addArgumentType(argDef.symbol, aggType)
+        context.markSymbolWithType(argDef.symbol, aggType)
         aggType
       }
 
       def extractAllArgType(bodyExpressions : Seq[Tree], argDef : Tree) : Seq[AggregateType] = bodyExpressions.collect {
         case functionCall : Apply => context.extractAggFunctionFromTree(functionCall) match {
-          case Some(aggFun) => extractArgTypeFromApply(functionCall, aggFun, argDef)
-          case None =>
+          case Some(aggFun) => extractArgTypeFromApply(functionCall, aggFun, argDef) //funzione già risolta, estraggo i tipi
+          case None => //non c'è ancora una funzione aggregate associata
             nameLinkToFunction.get(functionCall.symbol) match {
-              case Some(aggUnsolvedFunction) => resolveInDepth(aggUnsolvedFunction, functionCall, argDef)
+              case Some(aggUnsolvedFunction) => resolveInDepth(aggUnsolvedFunction, functionCall, argDef) //ne esiste una da risolve, allora vado nella risoluzione in profondità
               case _ => List.empty
             }
         }
       }.flatten
 
       def resolveInDepth(aggUnsolvedFunction : DefDef, functionCall : Apply, argDef : Tree): Seq[AggregateType] = {
-        if (resolveType(aggUnsolvedFunction, nameLinkToFunction)) {
+        if (resolveType(aggUnsolvedFunction, nameLinkToFunction)) { //risolvo la funzione non marcata
           extractArgTypeFromApply(functionCall, context.extractAggFunctionFromTree(functionCall).get, argDef)
         } else {
-          List.empty
+          List.empty //se non riesco a marcarla, non possono dire niente e quindi restituisco empty
         }
       }
 
-      //TODO CLARIFY THIS METHOD
       def extractArgTypeFromApply(apply : Apply, aggDef : AggregateFunction, argDef : Tree) : Seq[AggregateType] = {
         val blocksUncurried = aggDef.argsReversed.zipWithIndex.map {
-          case (argsBlockAgg, index) => (argsBlockAgg, uncurry(apply, index))
+          case (argsBlockAgg, index) => (argsBlockAgg, uncurrying(apply, index))
         }.collect {
           case (argsBlockAgg, Some(argTree)) => (argsBlockAgg, argTree.args.zipWithIndex)
         }
@@ -122,12 +123,12 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
       resolvingSet += funDef.symbol
 
       val args = funDef.vparamss
-        .map(params => block(params.map(resolveArg):_*))
+        .map(params => AggregateFunction.block(params.map(resolveArg):_*))
         .filter(_.nonEmpty)
 
       ///return type eval
       val returnType = resolveReturnType(funDef.rhs)
-      val aggFunDef = AggregateFunction(funDef.symbol.fullName, returnType, args)
+      val aggFunDef = AggregateFunction.fromSymbol(funDef.symbol, returnType, args)
       global.inform(funDef.pos, resolveAggDefinition(aggFunDef))
       c.addAggregateFunction(funDef.symbol, aggFunDef)
       resolvingSet -= funDef.symbol
@@ -149,7 +150,7 @@ object DiscoverComponent extends ComponentDescriptor  {
 
   override val runsBefore: List[String] = List(TypeCheckComponent.name)
 
-  override val runsAfter: List[String] = List("refchecks")
+  override val runsAfter: List[String] = List("pickler")
 
   def resolveAggDefinition(aggFun : AggregateFunction) : String = "resolved:" + aggFun
 

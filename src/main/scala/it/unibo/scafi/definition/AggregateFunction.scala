@@ -1,31 +1,32 @@
 package it.unibo.scafi.definition
 
 import it.unibo.scafi.definition.AggregateFunction._
+
+import scala.tools.nsc.Global
+
 /**
   * algebric data type used to represent field calculus types.
   */
-sealed trait AggregateType {
-
-}
+sealed trait AggregateType
 /**
   * L stands for "local". the type must be a local value.
  */
 case object L extends AggregateType
 
 /**
-  * F stands for "field. the type must be a field value
+  * F stands for "field". the type must be a field value
   */
 case object F extends AggregateType
 
 /**
-  * T represent a type that can be field or local.
+  * T represents a type that can be whether a field or a local value.
   */
 case object T extends AggregateType
 
 /**
-  * this type represent the type of a function.
-  * @param args: the argument type list.
-  * @param returns: return type of function.
+  * this type represents the type of a function.
+  * @param args: the type argument list.
+  * @param returns: return the type of the function.
   */
 case class ArrowType(args : Seq[AggregateType], returns : AggregateType) extends AggregateType {
   override def toString: String = {
@@ -33,17 +34,20 @@ case class ArrowType(args : Seq[AggregateType], returns : AggregateType) extends
     s"$argString=>$returns"
   }
 }
-//TODO explain better
-
 /**
-  * describe the signature of an aggregate function. It is used to do
-  * type check over a standard scala type system. this object is associated with
+  * It describes the signature of an aggregate function. It is used to do
+  * type checking over a standard scala type system. this object is associated with
   * some function definition.
   * example:
-  *   scala definition:          def func[A](f: => A)(b : => A, c : Int) : A
-  *   scafi type representation: AggregateFunction(func, L, args(block(F),block(L,T))
-  * @param args: a sequence of function argument blocks. each block is a sequence of argument. This
-  *            structure is used to represent curried function.
+  *   scala definition:
+  *   package it.core
+  *   object Main {
+  *      def func[A](f: => A)(b : => A, c : Int) : A
+  *   }
+  *   scafi type representation:
+  *     AggregateFunction(it.core.Main.func, L, args(block(F),block(L,T))
+  * @param args: a sequence of blocks, each of them is a sequence of arguments. This
+  *            structure is used to represent currying functions.
   */
 case class AggregateFunction(name : String, returns : AggregateType, args : Seq[ArgsBlock]) {
   val argsReversed = args.reverse
@@ -56,7 +60,7 @@ object AggregateFunction {
   type ArgsBlock = Seq[AggregateType]
 
   /**
-    * transform a sequence of aggregate function definition into a map in which each name
+    * transform a sequence of aggregate function definitions into a map in which each function name
     * is associated with its aggregate function definition.
     */
   def toMap(aggregateFunctions: AggregateFunction *): Map[String, AggregateFunction] = {
@@ -64,8 +68,8 @@ object AggregateFunction {
   }
 
   /**
-    * "dsl" function used to make argument block creation easier. wrap a sequence or argument
-    * type into a argument function block.
+    * "dsl" function used to make argument block creation easier. It wraps a sequence or
+    * an argument type into an argument function block.
     */
   def block(types : AggregateType *) : ArgsBlock = types
 
@@ -80,6 +84,13 @@ object AggregateFunction {
   def aggFun(name : String, returns : AggregateType, args : Seq[ArgsBlock]) : AggregateFunction = {
     AggregateFunction(name, returns, args)
   }
+  /**
+    * shortcut of AggregateFunction constructor.
+    */
+  def fromSymbol(name : Global#Symbol, returns : AggregateType, args : Seq[ArgsBlock]) : AggregateFunction = {
+    AggregateFunction(name.fullName, returns, args)
+  }
+
   private def productToSeq(p : Product) : Seq[AggregateType] = p.productIterator.toList.map {
     case value : AggregateType => value
   }

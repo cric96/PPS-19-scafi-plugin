@@ -1,4 +1,4 @@
-package it.unibo.scafi.plugin
+package it.unibo.scafi.plugin.component
 
 import it.unibo.scafi.definition.AggregateFunction.{aggFun, args, block}
 import it.unibo.scafi.definition.{F, L, T}

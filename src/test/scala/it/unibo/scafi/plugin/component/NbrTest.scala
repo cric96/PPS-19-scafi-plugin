@@ -1,4 +1,4 @@
-package it.unibo.scafi.plugin
+package it.unibo.scafi.plugin.component
 
 import it.unibo.scafi.definition.AggregateFunction._
 import it.unibo.scafi.definition._
@@ -14,10 +14,10 @@ class NbrTest extends PluginTest(false) {
     val nestedNbr = compiler.compile(
       writeInMain(
         """
-          |val x : Int = 2
           |nbr{nbr{10}}
         """.stripMargin
-    ).stripMargin)
+      )
+    )
     nestedNbr.hasErrors shouldBe true
     nestedNbr.errors.contains(aggregateTypeError(nbrSig, L, F)) shouldBe true
     /*

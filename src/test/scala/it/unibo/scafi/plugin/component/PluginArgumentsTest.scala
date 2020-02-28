@@ -1,13 +1,14 @@
-package it.unibo.scafi.plugin
+package it.unibo.scafi.plugin.component
 
 import it.unibo.scafi.definition.AggregateFunction.{aggFun, args, block}
 import it.unibo.scafi.definition.{F, L, T}
-import it.unibo.scafi.plugin.TypeCheckComponent.aggregateTypeError
+import it.unibo.scafi.plugin.ScafiCompilerPlatform
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class PluginArgumentsTest extends PluginTest {
+  import TypeCheckComponent._
   val repSig = aggFun("it.unibo.scafi.core.Language.Constructs.rep", returns = L, args(block(L), block(T)))
   val compilerNoWraps = new ScafiCompilerPlatform(false, "disable:transform")
   val compilerPluginDisable = new ScafiCompilerPlatform(false, "disable:*")

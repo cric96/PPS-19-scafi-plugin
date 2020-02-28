@@ -1,13 +1,13 @@
-package it.unibo.scafi.plugin
-import it.unibo.scafi.definition.AggregateFunction._
+package it.unibo.scafi.plugin.component
+
 import it.unibo.scafi.definition._
-import it.unibo.scafi.plugin.TypeCheckComponent._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class FoldhoodTest extends PluginTest {
   import AggregateFunction._
+  import TypeCheckComponent._
   val foldhoodSig = aggFun("it.unibo.scafi.core.Language.Constructs.foldhood", L, args(block(L), block((T,T) -> T), block(F)))
   "Scafi plugin" should "raise an error if foldhood call isn't correct" in {
     val localWrongReport = compiler.compile(writeInMain {

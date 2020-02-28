@@ -1,7 +1,13 @@
-package it.unibo.scafi.plugin
+package it.unibo.scafi.plugin.component
 
+import it.unibo.scafi.plugin.ScafiCompilerPlatform
 import org.scalatest.{BeforeAndAfterEach, FlatSpec, Matchers}
 
+/**
+  * struttura comune ai vari test, contiene una parte di codice che definisce una struttura
+  * simile a Scafi per poter verificare l'effettivo funzionamento del plugin
+  * @param verbose
+  */
 class PluginTest(verbose : Boolean = false) extends FlatSpec with BeforeAndAfterEach with Matchers{
   protected var compiler : ScafiCompilerPlatform = _
   override def beforeEach(): Unit = {
@@ -26,7 +32,8 @@ class PluginTest(verbose : Boolean = false) extends FlatSpec with BeforeAndAfter
      |}
      |trait Semantics extends RichLanguage {
      |  trait ProgramSchema extends Constructs with Lib {
-     |    def main() : Unit
+     |    type MainResult = Any
+     |    def main() : MainResult
      |  }
      |}
      |object core extends Semantics

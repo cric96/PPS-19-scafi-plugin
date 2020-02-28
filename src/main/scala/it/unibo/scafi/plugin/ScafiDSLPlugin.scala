@@ -1,18 +1,21 @@
 package it.unibo.scafi.plugin
 
 import it.unibo.scafi.definition.{AggregateFunction, F, L, T}
+import it.unibo.scafi.plugin.common.{AbstractComponent, ComponentContext}
+import it.unibo.scafi.plugin.component.{DiscoverComponent, TransformComponent, TypeCheckComponent}
 
 import scala.tools.nsc.Global
 import scala.tools.nsc.plugins.Plugin
 
+
 /**
-  * This plugin support compile-time checking in a scafi aggregate program.
-  * It could be change the program structure too.
+  * This plugin supports compile-time checking in a scafi aggregate program.
+  * It could change the program structure too.
   * The plugin has three different components:
-  *   - type check component: do all compile time checking in the aggregate program,
-  *   - discover component: find all aggregate function definitions in the current compilation,
-  *   - transform component: find all thing that the programs need to transform to satisfy certain properties,
-  *       for example: find all function in the aggregate program and wraps into aggregate constructor.
+  *   - type-check component: it does all compile time checks in the aggregate program;
+  *   - discover component: it finds all the aggregate function definitions in the current compilation;
+  *   - transform component: it finds all the things that the programs need to transform to satisfy certain properties,
+  *       for example: find all the functions in the aggregate program and wrap them into an aggregate constructor.
   */
 class ScafiDSLPlugin(val global: Global) extends Plugin {
   //global include all compile time information.
@@ -46,7 +49,7 @@ class ScafiDSLPlugin(val global: Global) extends Plugin {
   /**
     * scafi plugin options follow this syntax:
     *  -Pscafi:optionName:value...
-    * each component can use this option to add/remove functionality or to set some internal properties.
+    * each component can use this option to add/remove a functionality or to set some internal properties.
     */
   override def processOptions(options: List[String], error: String => Unit): Unit = {
     for (option <- options) {
