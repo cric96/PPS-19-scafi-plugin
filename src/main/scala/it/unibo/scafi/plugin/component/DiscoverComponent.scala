@@ -20,7 +20,7 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
   var resolvingSet : Set[Symbol] = Set.empty //set usato per evitare problemi associati alla ricorsione
 
   override def newPhase(prev: Phase): Phase = new DiscoverPhase(prev)
-
+  var i = 0
   class DiscoverPhase(prev : Phase) extends StdPhase(prev) {
     override def run(): Unit = {  //run viene chiamato in cascata alla fase precedente, in questo punto accedo (virtualmente) a tutti i sorgenti
       echoPhaseSummary(this)
