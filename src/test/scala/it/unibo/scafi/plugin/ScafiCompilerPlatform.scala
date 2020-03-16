@@ -4,6 +4,7 @@ import scala.reflect.internal.util.Position
 import scala.tools.nsc.io.VirtualDirectory
 import scala.tools.nsc.reporters.AbstractReporter
 import scala.tools.nsc.{Global, Settings}
+import scala.tools.reflect.ReflectGlobal
 
 /**
   * platform used to compile code during testing. Code is passed as a string.
@@ -20,7 +21,8 @@ class ScafiCompilerPlatform(verbose : Boolean, pluginOptions : String *) {
   settings.usejavacp.value = true //used to find the scala compiler by the global
   //create global, attach the new plugin phases, using a report to check error and warning
   private def createGlobal(report : AbstractReporter) : Global = {
-    new Global(settings,report) {
+    //FIX problem with scala not found in sbt.
+    new ReflectGlobal(settings,report, this.getClass.getClassLoader) {
       override protected def loadRoughPluginsList() = new ScafiDSLPlugin(this) :: super.loadRoughPluginsList()
     }
   }

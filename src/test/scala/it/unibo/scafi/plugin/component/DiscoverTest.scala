@@ -30,7 +30,6 @@ class DiscoverTest extends PluginTest {
         |   foldhood{a}{(x,y) => x}{b}
         |}
         |""".stripMargin))
-    println(report.errors)
   }
 
   /*
