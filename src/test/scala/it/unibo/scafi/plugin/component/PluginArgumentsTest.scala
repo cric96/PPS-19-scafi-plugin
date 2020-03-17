@@ -46,7 +46,6 @@ class PluginArgumentsTest extends PluginTest {
         | rep{nbr{10}}{x => x}
     """.stripMargin
     })
-    println(report.errors)
     report.hasErrors shouldBe false
     report.hasWarnings shouldBe false
   }

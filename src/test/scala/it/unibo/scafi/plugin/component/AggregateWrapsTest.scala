@@ -3,7 +3,6 @@ package it.unibo.scafi.plugin.component
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
-//TODO improve test
 @RunWith(classOf[JUnitRunner])
 class AggregateWrapsTest extends PluginTest {
   "Scafi plugin" should "wraps lambda using aggregate" in {
