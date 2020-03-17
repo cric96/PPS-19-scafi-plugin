@@ -64,6 +64,7 @@ Some useful links:
 - scala compiler doc : https://www.scala-lang.org/api/2.12.3/scala-compiler/scala/tools/nsc/index.html
 - quasi qoute intro : https://docs.scala-lang.org/overviews/quasiquotes/intro.html
 
+[report](./doc/report.pdf).
 
 Done by Gianluca Aguzzi
 
