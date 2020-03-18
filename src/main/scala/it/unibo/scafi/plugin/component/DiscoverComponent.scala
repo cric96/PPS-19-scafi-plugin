@@ -41,10 +41,10 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
 
     private def findAllConstructs(tree: Tree): Seq[DefDef] = {
       def nameAllowed(symbol : Global#Symbol) : Boolean = {
-        symbol.fullName match {
-          case name if name.contains("init") => false
-          case name if name.contains("apply") => false
-          case name if name.contains("main") => false
+        symbol.nameString match {
+          case name if name.contains("<init>") => false
+          //case name if name.contains("apply") => false
+          //case name if name.contains("main") => false
           case _ => context.extractAggFunctionFromSymbol(symbol).isEmpty
         }
       }
@@ -125,7 +125,6 @@ class DiscoverComponent(val c : ComponentContext) extends AbstractComponent(c, D
       val args = funDef.vparamss
         .map(params => AggregateFunction.block(params.map(resolveArg):_*))
         .filter(_.nonEmpty)
-
       ///return type eval
       val returnType = resolveReturnType(funDef.rhs)
       val aggFunDef = AggregateFunction.fromSymbol(funDef.symbol, returnType, args)

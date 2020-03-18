@@ -86,11 +86,11 @@ class TypeCheckComponent(context : ComponentContext) extends AbstractComponent(c
       }
       argDefinition.children.foreach(aggregateFunctionsCorrectness)
     }
+    //TODO fix. find a robust way to check the field presence in argument.
     //check if exists a call that return a field
     private def isFieldPresent(tree : Tree) : Boolean = {
-      tree.children.map(extractAggregateFunction)
-        .collect { case Some(aggFun) => aggFun }
-        .exists(_.returns == F)
+      extractAggregateFunction(tree)
+          .exists(_.returns == F) || tree.children.exists(isFieldPresent)
     }
 
     private def extractAggregateFunction(tree : Tree) : Option[AggregateFunction] =  context.extractAggFunctionFromTree(tree)
