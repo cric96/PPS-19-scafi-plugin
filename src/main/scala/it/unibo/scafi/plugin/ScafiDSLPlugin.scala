@@ -29,7 +29,7 @@ class ScafiDSLPlugin(val global: Global) extends Plugin {
     aggFun(s"$baseClass.nbr", returns = F, args(block(L))),
     aggFun(s"$baseClass.foldhood", returns = L, args(block(L), block((T,T) -> T), block(F))),
     aggFun(s"$baseClass.rep", returns = L, args(block(L), block(T))),
-    //other on the implementation different from implementation!
+    //other on the implementation that has different symbol from definitions!
     aggFun(s"$baseClassImpl.nbr", returns = F, args(block(L))),
     aggFun(s"$baseClassImpl.foldhood", returns = L, args(block(L), block((T,T) -> T), block(F))),
     aggFun(s"$baseClassImpl.rep", returns = L, args(block(L), block(T)))
